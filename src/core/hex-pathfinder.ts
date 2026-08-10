@@ -18,7 +18,7 @@ export class HexPathfinder {
   }
 
   /**
-   * Finds the optimal path from start to target using A* algorithm considering terrain MP costs.
+   * Finds the optimal path from start to target using A* algorithm considering terrain MP costs and unit blocks.
    */
   public static findPath(
     start: HexCoord,
@@ -64,7 +64,10 @@ export class HexPathfinder {
         if (!tile) continue;
 
         const cost = TerrainMatrix.getMovementCost(tile.terrain, unitCategory);
-        if (cost === Infinity || tile.blockedByUnit) continue;
+
+        // Block if terrain is impassable OR blocked by another unit (unless neighbor is the target itself)
+        const isTarget = neighbor.q === target.q && neighbor.r === target.r;
+        if (cost === Infinity || (tile.blockedByUnit && !isTarget)) continue;
 
         const tentativeGScore = (gScore.get(currentKey) ?? Infinity) + cost;
 
@@ -86,7 +89,7 @@ export class HexPathfinder {
   }
 
   /**
-   * Returns list of all reachable hex coordinates within available MP budget.
+   * Returns list of all reachable hex coordinates within available MP budget (excluding hexes blocked by units).
    */
   public static getReachableHexes(
     start: HexCoord,
@@ -109,7 +112,8 @@ export class HexPathfinder {
         if (!tile) continue;
 
         const cost = TerrainMatrix.getMovementCost(tile.terrain, unitCategory);
-        if (cost === Infinity || tile.blockedByUnit) continue;
+        const isStart = neighbor.q === start.q && neighbor.r === start.r;
+        if (cost === Infinity || (tile.blockedByUnit && !isStart)) continue;
 
         const totalCost = currentCost + cost;
         if (totalCost <= maxMP) {
@@ -123,5 +127,45 @@ export class HexPathfinder {
     }
 
     return reachable;
+  }
+
+  /**
+   * Finds the optimal unoccupied hex cell to move to in order to attack targetEnemyCoord within attackRange.
+   * Stops at the nearest valid hex tile within Range.
+   */
+  public static findAttackPosition(
+    start: HexCoord,
+    targetEnemyCoord: HexCoord,
+    attackRange: number,
+    maxMP: number,
+    unitCategory: UnitCategory,
+    tileLookup: (coord: HexCoord) => MapHexTile | undefined
+  ): PathResult | null {
+    // 1. If start is ALREADY within attackRange, no movement required!
+    const currentDist = HexMath.getDistance(start, targetEnemyCoord);
+    if (currentDist <= attackRange) {
+      return { path: [start], totalCost: 0 };
+    }
+
+    // 2. Find all candidate unoccupied tiles reachable within MP that are within attackRange of targetEnemyCoord
+    const reachableHexes = HexPathfinder.getReachableHexes(start, maxMP, unitCategory, tileLookup);
+    let bestPath: PathResult | null = null;
+    let minCost = Infinity;
+
+    for (const [key] of reachableHexes.entries()) {
+      const [q, r] = key.split(',').map(Number);
+      const candHex: HexCoord = { q, r };
+      const distToEnemy = HexMath.getDistance(candHex, targetEnemyCoord);
+
+      if (distToEnemy <= attackRange) {
+        const pathRes = HexPathfinder.findPath(start, candHex, maxMP, unitCategory, tileLookup);
+        if (pathRes && pathRes.totalCost < minCost) {
+          minCost = pathRes.totalCost;
+          bestPath = pathRes;
+        }
+      }
+    }
+
+    return bestPath;
   }
 }

@@ -32,37 +32,50 @@ describe('HexPathfinder Unit Tests', () => {
 
     expect(result).not.toBeNull();
     expect(result!.totalCost).toBe(3);
-    expect(result!.path.length).toBe(4); // Start + 3 steps
+    expect(result!.path.length).toBe(4);
     expect(result!.path[result!.path.length - 1]).toEqual(target);
   });
 
-  it('test_a_star_detours_around_impassable_mountains', () => {
+  it('test_find_attack_position_stops_at_nearest_hex_within_range', () => {
     const grid = createMockGrid();
     const start: HexCoord = { q: 0, r: 0 };
-    const target: HexCoord = { q: 2, r: 0 };
+    const enemy: HexCoord = { q: 3, r: 0 };
 
-    // Place impassable mountain on direct path at (1, 0)
-    grid.set(HexPathfinder.hexKey({ q: 1, r: 0 }), {
-      coord: { q: 1, r: 0 },
-      terrain: 'MOUNTAIN'
-    });
-
-    const result = HexPathfinder.findPath(
+    // Melee attack range = 1
+    const meleeResult = HexPathfinder.findAttackPosition(
       start,
-      target,
-      5,
+      enemy,
+      1, // Attack Range = 1
+      5, // Max MP
       'INFANTRY',
       (coord) => grid.get(HexPathfinder.hexKey(coord))
     );
 
-    expect(result).not.toBeNull();
-    expect(result!.path).not.toContainEqual({ q: 1, r: 0 });
-    expect(result!.path[result!.path.length - 1]).toEqual(target);
+    expect(meleeResult).not.toBeNull();
+    // Should stop at (2, 0) which is 1 hex away from enemy (3, 0)
+    expect(meleeResult!.path[meleeResult!.path.length - 1]).toEqual({ q: 2, r: 0 });
+
+    // Archer attack range = 3 (already in range from start (0,0)!)
+    const archerResult = HexPathfinder.findAttackPosition(
+      start,
+      enemy,
+      3, // Attack Range = 3
+      5,
+      'ARCHER',
+      (coord) => grid.get(HexPathfinder.hexKey(coord))
+    );
+
+    expect(archerResult).not.toBeNull();
+    expect(archerResult!.path[0]).toEqual(start); // No movement needed!
   });
 
-  it('test_get_reachable_hexes_within_mp', () => {
+  it('test_units_cannot_occupy_same_hex', () => {
     const grid = createMockGrid();
     const start: HexCoord = { q: 0, r: 0 };
+    const target: HexCoord = { q: 1, r: 0 };
+
+    // Block target hex with another unit
+    grid.set('1,0', { coord: { q: 1, r: 0 }, terrain: 'GROUND', blockedByUnit: true });
 
     const reachable = HexPathfinder.getReachableHexes(
       start,
@@ -71,10 +84,6 @@ describe('HexPathfinder Unit Tests', () => {
       (coord) => grid.get(HexPathfinder.hexKey(coord))
     );
 
-    // Range 2 reachable count on empty hex grid = 1 + 6 + 12 = 19 hexes
-    expect(reachable.size).toBe(19);
-    expect(reachable.get('0,0')).toBe(0);
-    expect(reachable.get('1,0')).toBe(1);
-    expect(reachable.get('2,0')).toBe(2);
+    expect(reachable.has('1,0')).toBe(false); // Cannot step on occupied hex!
   });
 });

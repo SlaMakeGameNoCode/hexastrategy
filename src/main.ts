@@ -17,7 +17,6 @@ window.addEventListener('DOMContentLoaded', () => {
   const hud = new HUDOverlay();
   const turnManager = new TurnManager();
 
-  // Floating text animations
   const floatingTexts: FloatingText[] = [];
 
   // Create Hex Map Grid (-4 to +4 radius)
@@ -35,7 +34,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
         const tileData: MapTileRenderData = { coord: { q, r }, terrain };
         mapTiles.push(tileData);
-        tileMap.set(HexPathfinder.hexKey({ q, r }), { coord: { q, r }, terrain });
+        tileMap.set(HexPathfinder.hexKey({ q, r }), { coord: { q, r }, terrain, blockedByUnit: false });
       }
     }
   }
@@ -53,19 +52,47 @@ window.addEventListener('DOMContentLoaded', () => {
   let isResolvingTurn = false;
   let currentRound = 1;
 
-  // Initialize selection for Player Unit 1
-  selectUnit(units[0]);
+  // Synchronize occupied tiles so units cannot occupy the same hex
+  function updateTileOccupancy() {
+    for (const tile of tileMap.values()) {
+      tile.blockedByUnit = false;
+    }
+    for (const u of units) {
+      if (u.hp > 0) {
+        const key = HexPathfinder.hexKey(u.position);
+        const tile = tileMap.get(key);
+        if (tile) tile.blockedByUnit = true;
+      }
+    }
+  }
+
+  updateTileOccupancy();
+
+  // Helper tile lookup function for Pathfinder
+  function getTileForPathfinding(c: HexCoord): MapHexTile | undefined {
+    const tile = tileMap.get(HexPathfinder.hexKey(c));
+    if (!tile) return undefined;
+    // Unblock selected unit's own tile so it can move out
+    if (selectedUnit && c.q === selectedUnit.position.q && c.r === selectedUnit.position.r) {
+      return { ...tile, blockedByUnit: false };
+    }
+    return tile;
+  }
 
   function selectUnit(unit: RenderableUnit) {
-    if (unit.ownerColor !== '#3B82F6' || isResolvingTurn) return; // Only select player units
+    if (unit.ownerColor !== '#3B82F6' || isResolvingTurn) return;
     selectedUnit = unit;
+    updateTileOccupancy();
+
     pathOverlay.selectUnit(
       unit.position,
       unit.category,
       5,
-      (c) => tileMap.get(HexPathfinder.hexKey(c))
+      getTileForPathfinding
     );
   }
+
+  selectUnit(units[0]);
 
   // Recalculate remaining AP from assigned actions
   function updateAPBudget() {
@@ -108,23 +135,28 @@ window.addEventListener('DOMContentLoaded', () => {
     isResolvingTurn = true;
     turnManager.stopTimer();
 
-    // AI Bot assigns actions for Enemy Units
+    // AI Bot assigns actions for Enemy Units (stops at nearest attack tile)
     for (const u of units) {
       if (u.ownerColor === '#EF4444' && u.hp > 0) {
-        // AI decides to move towards nearest player unit
-        const pathRes = HexPathfinder.findPath(
-          u.position,
-          { q: -1, r: 0 },
-          4,
-          u.category,
-          (c) => tileMap.get(HexPathfinder.hexKey(c))
-        );
-        if (pathRes && pathRes.path.length > 1) {
-          u.assignedAction = {
-            type: 'MOVE',
-            targetHex: pathRes.path[pathRes.path.length - 1],
-            cost: 2
-          };
+        const playerTarget = units.find(p => p.ownerColor === '#3B82F6' && p.hp > 0);
+        if (playerTarget) {
+          const range = u.category === 'ARCHER' ? 3 : 1;
+          const attackPosRes = HexPathfinder.findAttackPosition(
+            u.position,
+            playerTarget.position,
+            range,
+            4,
+            u.category,
+            getTileForPathfinding
+          );
+
+          if (attackPosRes && attackPosRes.path.length > 1) {
+            u.assignedAction = {
+              type: 'MOVE',
+              targetHex: attackPosRes.path[attackPosRes.path.length - 1],
+              cost: 2
+            };
+          }
         }
       }
     }
@@ -140,7 +172,7 @@ window.addEventListener('DOMContentLoaded', () => {
           endPos,
           6,
           u.category,
-          (c) => tileMap.get(HexPathfinder.hexKey(c))
+          getTileForPathfinding
         );
 
         if (pathResult && pathResult.path.length > 1) {
@@ -150,7 +182,6 @@ window.addEventListener('DOMContentLoaded', () => {
             const pFrom = HexMath.hexToPixel(fromHex, renderer.getHexRadius());
             const pTo = HexMath.hexToPixel(toHex, renderer.getHexRadius());
 
-            // Animate 15 frames per hex step
             for (let f = 1; f <= 15; f++) {
               const t = f / 15;
               u.animPos = {
@@ -160,6 +191,7 @@ window.addEventListener('DOMContentLoaded', () => {
               await new Promise((r) => setTimeout(r, 16));
             }
             u.position = { ...toHex };
+            updateTileOccupancy();
           }
           delete u.animPos;
         }
@@ -177,12 +209,10 @@ window.addEventListener('DOMContentLoaded', () => {
         const dmgResult = CombatResolver.calculateDamage('HEAVY_CAVALRY', 'SHORT_SPEAR', true, isBrace);
 
         if (dmgResult.isBraceCounterTriggered) {
-          // Counter hits Enemy Cav first!
           eCav.hp = Math.max(0, eCav.hp - dmgResult.finalDamage);
           const pos = HexMath.hexToPixel(eCav.position, renderer.getHexRadius());
           floatingTexts.push({ x: pos.x, y: pos.y - 30, text: `-${dmgResult.finalDamage} COUNTER!`, color: '#F59E0B', alpha: 1.0 });
         } else {
-          // Cav hits Spear
           pSpear.hp = Math.max(0, pSpear.hp - dmgResult.finalDamage);
           const pos = HexMath.hexToPixel(pSpear.position, renderer.getHexRadius());
           floatingTexts.push({ x: pos.x, y: pos.y - 30, text: `-${dmgResult.finalDamage}`, color: '#EF4444', alpha: 1.0 });
@@ -197,6 +227,7 @@ window.addEventListener('DOMContentLoaded', () => {
       delete u.assignedAction;
     }
 
+    updateTileOccupancy();
     currentRound += 1;
     isResolvingTurn = false;
     updateAPBudget();
@@ -206,7 +237,6 @@ window.addEventListener('DOMContentLoaded', () => {
   // Canvas Coordinates Conversion
   function getCanvasHex(evt: MouseEvent): HexCoord {
     const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
     const px = (evt.clientX - rect.left - rect.width / 2);
     const py = (evt.clientY - rect.top - rect.height / 2);
     return HexMath.pixelToHex({ x: px, y: py }, renderer.getHexRadius());
@@ -227,14 +257,45 @@ window.addEventListener('DOMContentLoaded', () => {
       (u) => u.hp > 0 && u.position.q === clickedHex.q && u.position.r === clickedHex.r
     );
 
+    // 1. Click on Player Unit -> Select it
     if (clickedUnit && clickedUnit.ownerColor === '#3B82F6') {
       selectUnit(clickedUnit);
       return;
     }
 
-    // Assign Move Action to Selected Unit
+    // 2. Click on Enemy Unit -> Calculate Nearest Attack Position based on Range & Move there
+    if (clickedUnit && clickedUnit.ownerColor === '#EF4444' && selectedUnit) {
+      const range = selectedUnit.category === 'ARCHER' ? 3 : 1;
+      const attackPosRes = HexPathfinder.findAttackPosition(
+        selectedUnit.position,
+        clickedUnit.position,
+        range,
+        5,
+        selectedUnit.category,
+        getTileForPathfinding
+      );
+
+      if (attackPosRes && attackPosRes.path.length > 0) {
+        const targetHex = attackPosRes.path[attackPosRes.path.length - 1];
+        const apCost = Math.min(3, Math.max(1, attackPosRes.path.length - 1 || 1));
+        if (hud.getAPRemaining() >= apCost) {
+          selectedUnit.assignedAction = {
+            type: 'ATTACK',
+            targetHex,
+            cost: apCost
+          };
+          updateAPBudget();
+        }
+      }
+      return;
+    }
+
+    // 3. Click on Empty Reachable Hex -> Assign Move Action (No overlapping!)
     if (selectedUnit && selectedUnit.ownerColor === '#3B82F6') {
-      const pathRes = pathOverlay.getPathPreview(clickedHex, (c) => tileMap.get(HexPathfinder.hexKey(c)));
+      const tile = tileMap.get(HexPathfinder.hexKey(clickedHex));
+      if (tile && tile.blockedByUnit) return; // Cannot land on occupied tile!
+
+      const pathRes = pathOverlay.getPathPreview(clickedHex, getTileForPathfinding);
       if (pathRes && pathRes.path.length > 1) {
         const apCost = Math.min(3, Math.max(1, pathRes.path.length - 1));
         const currentAP = hud.getAPRemaining();
@@ -269,7 +330,7 @@ window.addEventListener('DOMContentLoaded', () => {
   function loop() {
     let pathPreviewCoords: HexCoord[] | undefined = undefined;
     if (hoveredHex && selectedUnit && !isResolvingTurn) {
-      const pathRes = pathOverlay.getPathPreview(hoveredHex, (c) => tileMap.get(HexPathfinder.hexKey(c)));
+      const pathRes = pathOverlay.getPathPreview(hoveredHex, getTileForPathfinding);
       if (pathRes) pathPreviewCoords = pathRes.path;
     }
 
