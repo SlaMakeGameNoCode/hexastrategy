@@ -2,6 +2,8 @@
  * Manages the 10-second planning timer and 10 AP budget validation for HEX LEGION.
  */
 
+export type MatchPhase = 'DEPLOYMENT' | 'PLANNING' | 'RESOLUTION';
+
 export interface UnitAction {
   unitId: string;
   type: 'MOVE' | 'ATTACK' | 'ABILITY' | 'DEFEND' | 'WAIT';
@@ -20,9 +22,18 @@ export class TurnManager {
   public static readonly MAX_AP_BUDGET = 10;
   public static readonly PLANNING_TIME_SEC = 10;
 
+  private phase: MatchPhase = 'DEPLOYMENT';
   private timerSec: number = TurnManager.PLANNING_TIME_SEC;
   private timerInterval: any = null;
   private submittedPayloads: Map<string, PlayerTurnPayload> = new Map();
+
+  public getPhase(): MatchPhase {
+    return this.phase;
+  }
+
+  public setPhase(phase: MatchPhase): void {
+    this.phase = phase;
+  }
 
   /**
    * Validates AP cost sum for a submitted turn payload.

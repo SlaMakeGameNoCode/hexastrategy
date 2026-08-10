@@ -3,21 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HEX LEGION — Hexagonal Tactical Strategy Game</title>
+  <title>HEX LEGION — Tactical Hexagonal Strategy</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-dark: #090D16;
-      --panel-bg: rgba(15, 23, 42, 0.75);
+      --bg-dark: #070B12;
+      --panel-bg: rgba(13, 20, 36, 0.78);
+      --panel-border: rgba(255, 255, 255, 0.12);
       --accent-blue: #3B82F6;
+      --accent-blue-glow: rgba(59, 130, 246, 0.4);
       --accent-gold: #F59E0B;
+      --accent-gold-glow: rgba(245, 158, 11, 0.4);
       --accent-red: #EF4444;
       --accent-green: #10B981;
       --text-main: #F8FAFC;
       --text-muted: #94A3B8;
-      --border-glass: rgba(255, 255, 255, 0.12);
     }
 
     * {
@@ -34,8 +36,6 @@
       overflow: hidden;
       width: 100vw;
       height: 100vh;
-      display: flex;
-      flex-direction: column;
     }
 
     #game-container {
@@ -43,64 +43,62 @@
       width: 100%;
       height: 100%;
       display: flex;
-      justify-content: center;
-      align-items: center;
     }
 
     canvas {
       display: block;
       width: 100%;
       height: 100%;
-      background: radial-gradient(circle at center, #1E293B 0%, #0F172A 70%, #090D16 100%);
+      background: radial-gradient(circle at 50% 40%, #172439 0%, #0D1424 65%, #05080E 100%);
     }
 
-    /* HUD Top Bar */
+    /* Top HUD Bar */
     .hud-top {
       position: absolute;
-      top: 20px;
+      top: 18px;
       left: 50%;
       transform: translateX(-50%);
       display: flex;
       align-items: center;
-      gap: 24px;
-      padding: 12px 28px;
+      gap: 20px;
+      padding: 10px 24px;
       background: var(--panel-bg);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--border-glass);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--panel-border);
       border-radius: 999px;
-      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
-      z-index: 10;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+      z-index: 20;
     }
 
     .timer-badge {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
     }
 
     .timer-ring {
-      width: 44px;
-      height: 44px;
+      width: 42px;
+      height: 42px;
       border-radius: 50%;
-      background: conic-gradient(var(--accent-gold) 100%, rgba(255,255,255,0.1) 0%);
+      background: conic-gradient(var(--accent-gold) 100%, rgba(255,255,255,0.08) 0%);
       display: flex;
       justify-content: center;
       align-items: center;
-      box-shadow: 0 0 16px rgba(245, 158, 11, 0.3);
+      box-shadow: 0 0 16px var(--accent-gold-glow);
     }
 
     .timer-inner {
-      width: 36px;
-      height: 36px;
+      width: 34px;
+      height: 34px;
       border-radius: 50%;
-      background: #0F172A;
+      background: #0B111E;
       display: flex;
       justify-content: center;
       align-items: center;
       font-family: 'Outfit', sans-serif;
       font-weight: 800;
-      font-size: 16px;
+      font-size: 15px;
       color: var(--accent-gold);
     }
 
@@ -108,7 +106,7 @@
       display: flex;
       flex-direction: column;
       gap: 4px;
-      min-width: 180px;
+      min-width: 220px;
     }
 
     .ap-label {
@@ -117,19 +115,19 @@
       font-size: 12px;
       font-weight: 700;
       color: var(--text-muted);
-      text-transform: uppercase;
       letter-spacing: 0.5px;
     }
 
     .ap-label span:last-child {
       color: var(--accent-blue);
       font-weight: 800;
+      font-family: 'Outfit', sans-serif;
     }
 
     .ap-bar-bg {
       width: 100%;
-      height: 10px;
-      background: rgba(255, 255, 255, 0.1);
+      height: 8px;
+      background: rgba(255, 255, 255, 0.08);
       border-radius: 999px;
       overflow: hidden;
     }
@@ -140,10 +138,98 @@
       background: linear-gradient(90deg, #3B82F6 0%, #60A5FA 100%);
       border-radius: 999px;
       transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
+      box-shadow: 0 0 12px var(--accent-blue-glow);
     }
 
-    /* Controls Panel Bottom */
+    /* Floating Right Deck Drawer UI */
+    .deck-drawer {
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 280px;
+      max-height: calc(100vh - 120px);
+      background: var(--panel-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--panel-border);
+      border-radius: 24px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+      z-index: 20;
+    }
+
+    .drawer-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      text-align: center;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .deck-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .deck-grid::-webkit-scrollbar {
+      width: 4px;
+    }
+    .deck-grid::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 999px;
+    }
+
+    .deck-card-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      padding: 8px 12px;
+      border-radius: 12px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .deck-card-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.25);
+      transform: translateX(-3px);
+    }
+
+    .deck-card-btn.active {
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(37, 99, 235, 0.4) 100%);
+      border-color: #3B82F6;
+      box-shadow: 0 0 16px rgba(59, 130, 246, 0.3);
+      color: #FFFFFF;
+    }
+
+    .ap-tag {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60A5FA;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    /* Bottom Action Controls */
     .controls-panel {
       position: absolute;
       bottom: 24px;
@@ -151,20 +237,21 @@
       transform: translateX(-50%);
       display: flex;
       gap: 12px;
-      padding: 12px 20px;
+      padding: 10px 20px;
       background: var(--panel-bg);
-      backdrop-filter: blur(16px);
-      border: 1px solid var(--border-glass);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--panel-border);
       border-radius: 20px;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
-      z-index: 10;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+      z-index: 20;
     }
 
     .btn-action {
       background: rgba(255, 255, 255, 0.06);
-      border: 1px solid var(--border-glass);
+      border: 1px solid var(--panel-border);
       color: var(--text-main);
-      padding: 10px 18px;
+      padding: 10px 20px;
       border-radius: 12px;
       font-family: 'Outfit', sans-serif;
       font-weight: 700;
@@ -184,11 +271,33 @@
     .btn-action.primary {
       background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
       border-color: #3B82F6;
-      box-shadow: 0 4px 16px rgba(37, 99, 235, 0.4);
+      box-shadow: 0 6px 20px var(--accent-blue-glow);
     }
 
     .btn-action.primary:hover {
-      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.6);
+      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.7);
+      transform: translateY(-2px);
+    }
+
+    /* Modal Styling */
+    .modal-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(7, 11, 18, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      gap: 16px;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
     }
   </style>
 </head>
@@ -203,7 +312,7 @@
       </div>
       <div class="ap-container">
         <div class="ap-label">
-          <span>Ngân sách AP</span>
+          <span id="phase-title">Phase Chuẩn Bị Xếp Quân</span>
           <span id="ap-text">10 / 10 AP</span>
         </div>
         <div class="ap-bar-bg">
@@ -212,15 +321,92 @@
       </div>
     </div>
 
+    <!-- Left Side Unit Inspector & Counter Info Panel -->
+    <div id="unit-info-panel" style="position: absolute; left: 20px; top: 50%; transform: translateY(-50%); width: 260px; background: var(--panel-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--panel-border); border-radius: 24px; padding: 16px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6); z-index: 20;">
+      <div style="font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; text-align: center; padding-bottom: 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+        📊 Thông Tin Binh Chủng
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div id="info-unit-icon" style="font-size: 28px;">🗡️</div>
+        <div>
+          <div id="info-unit-name" style="font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 16px; color: #F8FAFC;">Giáo Ngắn</div>
+          <div id="info-unit-category" style="font-size: 11px; font-weight: 700; color: #60A5FA;">BỘ BINH (INFANTRY)</div>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: rgba(255,255,255,0.03); padding: 8px; border-radius: 12px; font-size: 11px;">
+        <div>❤️ HP: <b id="info-hp" style="color: #10B981;">100</b></div>
+        <div>⚔️ ATK: <b id="info-atk" style="color: #EF4444;">24</b></div>
+        <div>🛡️ DEF: <b id="info-def" style="color: #3B82F6;">18</b></div>
+        <div>👟 MP: <b id="info-mp" style="color: #F59E0B;">3</b></div>
+        <div>🎯 RANGE: <b id="info-range" style="color: #A855F7;">1</b></div>
+        <div>⚡ INIT: <b id="info-init" style="color: #EC4899;">5</b></div>
+      </div>
+      <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); pt-2; font-size: 11px;">
+        <div style="font-weight: 700; color: #F59E0B; margin-bottom: 4px;">⚔️ Tương Khắc Binh Chủng:</div>
+        <div id="info-counter-desc" style="color: #94A3B8; line-height: 1.4;">Ưu thế 150% DMG chống lại Kỵ Binh nhẹ. Bị Cung Thủ khắc chế.</div>
+      </div>
+    </div>
+
+    <!-- Right Side Deck Picker Drawer -->
+    <div class="deck-drawer" id="deck-drawer">
+      <div class="drawer-title">🛡️ Binh Chủng Chiêu Mộ</div>
+      <div class="deck-grid" id="deck-picker">
+        <button class="deck-card-btn active" data-class="SHORT_SPEAR">
+          <span>🗡️ Giáo Ngắn</span> <span class="ap-tag">1 AP</span>
+        </button>
+        <button class="deck-card-btn" data-class="LONG_SPEAR">
+          <span>🔱 Giáo Dài</span> <span class="ap-tag">2 AP</span>
+        </button>
+        <button class="deck-card-btn" data-class="SWORD_SHIELD">
+          <span>🛡️ Kiếm Khiên</span> <span class="ap-tag">2 AP</span>
+        </button>
+        <button class="deck-card-btn" data-class="GREATSWORD">
+          <span>⚔️ Trảm Mã Kiếm</span> <span class="ap-tag">2 AP</span>
+        </button>
+        <button class="deck-card-btn" data-class="LIGHT_CAVALRY">
+          <span>🏇 Kỵ Nhẹ</span> <span class="ap-tag">2 AP</span>
+        </button>
+        <button class="deck-card-btn" data-class="HEAVY_CAVALRY">
+          <span>🐎 Kỵ Nặng</span> <span class="ap-tag">3 AP</span>
+        </button>
+        <button class="deck-card-btn" data-class="HORSE_ARCHER">
+          <span>🏹 Kỵ Cung</span> <span class="ap-tag">3 AP</span>
+        </button>
+        <button class="deck-card-btn" data-class="SHORT_BOW">
+          <span>🎯 Cung Ngắn</span> <span class="ap-tag">1 AP</span>
+        </button>
+        <button class="deck-card-btn" data-class="LONGBOW">
+          <span>🏹 Cung Dài</span> <span class="ap-tag">2 AP</span>
+        </button>
+        <button class="deck-card-btn" data-class="CROSSBOW">
+          <span>⚡ Nỏ Đơn</span> <span class="ap-tag">2 AP</span>
+        </button>
+        <button class="deck-card-btn" data-class="HEAVY_CROSSBOW">
+          <span>💥 Nỏ Nặng</span> <span class="ap-tag">3 AP</span>
+        </button>
+        <button class="deck-card-btn" data-class="CATAPULT">
+          <span>💣 Mãng Pháo</span> <span class="ap-tag">3 AP</span>
+        </button>
+      </div>
+      <button class="btn-action primary" id="btn-start-battle" style="width: 100%; justify-content: center; margin-top: 4px;">
+        ⚔️ Bắt Đầu Trận Đấu
+      </button>
+    </div>
+
     <!-- HTML5 Canvas -->
     <canvas id="game-canvas"></canvas>
 
     <!-- Bottom Controls -->
-    <div class="controls-panel">
-      <button class="btn-action" id="btn-move">🚶 Di chuyển (1-3 AP)</button>
-      <button class="btn-action" id="btn-attack">⚔️ Tấn công</button>
+    <div class="controls-panel" id="planning-controls" style="display: none;">
       <button class="btn-action" id="btn-brace">🛡️ Thủ giáo (Brace)</button>
       <button class="btn-action primary" id="btn-end-turn">🚀 Gửi Lượt (Lock)</button>
+    </div>
+
+    <!-- Victory / Defeat Modal -->
+    <div id="result-modal" class="modal-overlay">
+      <div id="result-title" style="font-family: 'Outfit', sans-serif; font-size: 54px; font-weight: 800; color: #F59E0B; text-shadow: 0 0 32px rgba(245, 158, 11, 0.6);">VICTORY!</div>
+      <div id="result-desc" style="font-size: 16px; color: #94A3B8; font-weight: 600;">Bạn đã tiêu diệt toàn bộ lực lượng địch!</div>
+      <button class="btn-action primary" id="btn-next-battle" style="font-size: 16px; padding: 14px 32px; border-radius: 16px; margin-top: 8px;">🗺️ Trận Tiếp Theo (Bản Đồ Mới)</button>
     </div>
   </div>
 

@@ -15,6 +15,6 @@ describe('Canvas2DRenderer Unit Tests', () => {
     } as unknown as HTMLCanvasElement;
 
     const renderer = new Canvas2DRenderer(mockCanvas);
-    expect(renderer.getHexRadius()).toBe(36);
+    expect(renderer.getHexRadius()).toBe(28);
   });
 });
