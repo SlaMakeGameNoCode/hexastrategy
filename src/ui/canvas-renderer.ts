@@ -6,14 +6,28 @@ export interface RenderableUnit {
   name: string;
   category: 'INFANTRY' | 'CAVALRY' | 'ARCHER';
   position: HexCoord;
+  animPos?: { x: number; y: number }; // Smooth interpolated pixel position
   hp: number;
   maxHp: number;
   ownerColor: string;
+  assignedAction?: {
+    type: 'MOVE' | 'ATTACK' | 'BRACE';
+    targetHex?: HexCoord;
+    cost: number;
+  };
 }
 
 export interface MapTileRenderData {
   coord: HexCoord;
   terrain: TerrainType;
+}
+
+export interface FloatingText {
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  alpha: number;
 }
 
 export class Canvas2DRenderer {
@@ -22,7 +36,6 @@ export class Canvas2DRenderer {
   private offscreenCanvas: HTMLCanvasElement | null = null;
   private offscreenCtx: CanvasRenderingContext2D | null = null;
   private hexRadius: number = 36;
-  private isOffscreenDirty: boolean = true;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -45,10 +58,6 @@ export class Canvas2DRenderer {
     }
   }
 
-
-  /**
-   * Caches static terrain tiles onto offscreen canvas for high-performance rendering (<30 draw calls).
-   */
   public cacheTerrain(tiles: MapTileRenderData[], width: number, height: number): void {
     this.offscreenCanvas = document.createElement('canvas');
     this.offscreenCanvas.width = width;
@@ -71,27 +80,24 @@ export class Canvas2DRenderer {
         '#1E293B'
       );
     }
-    this.isOffscreenDirty = false;
   }
 
-  /**
-   * Renders the complete frame: background cache + units + UI overlays.
-   */
   public renderFrame(
     tiles: MapTileRenderData[],
     units: RenderableUnit[],
+    selectedUnitId?: string | null,
     highlightHexes?: Map<string, number>,
-    pathPreview?: HexCoord[]
+    pathPreview?: HexCoord[],
+    floatingTexts?: FloatingText[]
   ): void {
     const width = this.canvas.width;
     const height = this.canvas.height;
     const centerX = width / 2;
     const centerY = height / 2;
 
-    // Clear main canvas
     this.ctx.clearRect(0, 0, width, height);
 
-    // Render static background
+    // Static Background Terrain
     if (this.offscreenCanvas) {
       this.ctx.drawImage(this.offscreenCanvas, 0, 0);
     } else {
@@ -99,7 +105,7 @@ export class Canvas2DRenderer {
       if (this.offscreenCanvas) this.ctx.drawImage(this.offscreenCanvas, 0, 0);
     }
 
-    // Render Reachable Hex Highlights
+    // Highlight Reachable Hexes
     if (highlightHexes) {
       for (const [key] of highlightHexes.entries()) {
         const [q, r] = key.split(',').map(Number);
@@ -108,11 +114,12 @@ export class Canvas2DRenderer {
       }
     }
 
-    // Render Path Preview Overlay Line
+    // Path Preview Line & Destination Marker
     if (pathPreview && pathPreview.length > 1) {
       this.ctx.beginPath();
       this.ctx.strokeStyle = '#F59E0B';
       this.ctx.lineWidth = 4;
+      this.ctx.setLineDash([8, 4]);
 
       for (let i = 0; i < pathPreview.length; i++) {
         const pos = HexMath.hexToPixel(pathPreview[i], this.hexRadius);
@@ -122,16 +129,65 @@ export class Canvas2DRenderer {
         else this.ctx.lineTo(px, py);
       }
       this.ctx.stroke();
+      this.ctx.setLineDash([]);
+
+      // Destination Marker
+      const destPos = HexMath.hexToPixel(pathPreview[pathPreview.length - 1], this.hexRadius);
+      this.drawHexagon(this.ctx, centerX + destPos.x, centerY + destPos.y, this.hexRadius - 2, 'rgba(245, 158, 11, 0.4)', '#F59E0B');
     }
 
-    // Render Dynamic Units
+    // Render Units
     for (const unit of units) {
-      const pos = HexMath.hexToPixel(unit.position, this.hexRadius);
-      this.drawUnit(this.ctx, centerX + pos.x, centerY + pos.y, unit);
+      if (unit.hp <= 0) continue; // Dead units hidden
+
+      let px = centerX;
+      let py = centerY;
+
+      if (unit.animPos) {
+        px += unit.animPos.x;
+        py += unit.animPos.y;
+      } else {
+        const pos = HexMath.hexToPixel(unit.position, this.hexRadius);
+        px += pos.x;
+        py += pos.y;
+      }
+
+      const isSelected = selectedUnitId === unit.id;
+      this.drawUnit(this.ctx, px, py, unit, isSelected);
+
+      // Render Planned Action Target Indicator
+      if (unit.assignedAction && unit.assignedAction.targetHex) {
+        const tPos = HexMath.hexToPixel(unit.assignedAction.targetHex, this.hexRadius);
+        this.drawTargetFlag(this.ctx, centerX + tPos.x, centerY + tPos.y);
+      }
+    }
+
+    // Floating Text Popups
+    if (floatingTexts) {
+      for (const ft of floatingTexts) {
+        this.ctx.save();
+        this.ctx.globalAlpha = Math.max(0, ft.alpha);
+        this.ctx.fillStyle = ft.color;
+        this.ctx.font = 'bold 16px Outfit, sans-serif';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(ft.text, centerX + ft.x, centerY + ft.y);
+        this.ctx.restore();
+      }
     }
   }
 
-  private drawUnit(ctx: CanvasRenderingContext2D, x: number, y: number, unit: RenderableUnit): void {
+  private drawUnit(ctx: CanvasRenderingContext2D, x: number, y: number, unit: RenderableUnit, isSelected: boolean): void {
+    // Selection Ring Glow
+    if (isSelected) {
+      ctx.beginPath();
+      ctx.arc(x, y, 26, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.25)';
+      ctx.fill();
+      ctx.strokeStyle = '#60A5FA';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+
     // Circle Unit Body
     ctx.beginPath();
     ctx.arc(x, y, 18, 0, Math.PI * 2);
@@ -141,21 +197,42 @@ export class Canvas2DRenderer {
     ctx.lineWidth = 2.5;
     ctx.stroke();
 
-    // Unit Category Emblem Text
+    // Unit Category Text
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 10px Outfit, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(unit.category.substring(0, 3), x, y);
 
-    // Health Bar Background & Fill
-    const barW = 28;
+    // Health Bar
+    const barW = 32;
     const barH = 5;
     const hpRatio = Math.max(0, unit.hp / unit.maxHp);
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
-    ctx.fillRect(x - barW / 2, y - 26, barW, barH);
-    ctx.fillStyle = hpRatio > 0.5 ? '#22C55E' : hpRatio > 0.25 ? '#EAB308' : '#EF4444';
-    ctx.fillRect(x - barW / 2, y - 26, barW * hpRatio, barH);
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    ctx.fillRect(x - barW / 2, y - 28, barW, barH);
+    ctx.fillStyle = hpRatio > 0.5 ? '#10B981' : hpRatio > 0.25 ? '#F59E0B' : '#EF4444';
+    ctx.fillRect(x - barW / 2, y - 28, barW * hpRatio, barH);
+
+    // Action Badge
+    if (unit.assignedAction) {
+      ctx.beginPath();
+      ctx.arc(x + 14, y - 14, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#F59E0B';
+      ctx.fill();
+      ctx.fillStyle = '#0F172A';
+      ctx.font = 'bold 9px Outfit, sans-serif';
+      ctx.fillText(unit.assignedAction.cost.toString(), x + 14, y - 14);
+    }
+  }
+
+  private drawTargetFlag(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#F59E0B';
+    ctx.fill();
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
 
   private drawHexagon(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, fill: string, stroke: string): void {
@@ -177,10 +254,10 @@ export class Canvas2DRenderer {
 
   private getTerrainColor(terrain: TerrainType): string {
     switch (terrain) {
-      case 'ROAD': return '#64748B';
+      case 'ROAD': return '#475569';
       case 'GROUND': return '#1E293B';
       case 'HIGH_GROUND': return '#D97706';
-      case 'FOREST': return '#15803D';
+      case 'FOREST': return '#166534';
       case 'RUINS': return '#78350F';
       case 'MOUNTAIN': return '#334155';
       case 'WATER': return '#0284C7';
