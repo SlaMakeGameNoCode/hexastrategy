@@ -4,11 +4,20 @@
 > **GDD**: [design/gdd/game-concept.md](file:///f:/prototype/hexastreragy/design/gdd/game-concept.md)  
 > **Architecture Module**: WebSocketClient/Server & GameStateStore  
 > **Status**: Ready  
-> **Stories**: Not yet created — run `/create-stories epic-foundation-server`  
+> **Stories**: 3 Stories created  
 
 ## Overview
 
 Xây dựng hệ thống Server Authoritative và giao thức mạng WebSocket thời gian thực. Server làm chủ toàn bộ dữ liệu trận đấu (`MatchState`), đếm ngược 10 giây và kiểm tra tính hợp lệ của ngân sách 10 AP/lượt.
+
+## Stories
+
+| # | Story | Type | Status | ADR |
+|---|-------|------|--------|-----|
+| 001 | [WebSocket Server & Room Setup](file:///f:/prototype/hexastreragy/production/epics/epic-foundation-server/story-001-websocket-server-setup.md) | Logic | Ready | ADR-0002 |
+| 002 | [Simultaneous Turn Timer & AP Validator](file:///f:/prototype/hexastreragy/production/epics/epic-foundation-server/story-002-simultaneous-turn-timer-and-ap-validator.md) | Logic | Ready | ADR-0002 |
+| 003 | [Match State Serialization & Sync](file:///f:/prototype/hexastreragy/production/epics/epic-foundation-server/story-003-match-state-serialization-and-sync.md) | Integration | Ready | ADR-0002 |
+
 
 ## Governing ADRs
 
