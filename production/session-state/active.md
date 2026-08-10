@@ -1,15 +1,14 @@
 # Active Session State
 
-- **Active Epic**: `epic-foundation-server` (Status: COMPLETE - 3/3 Stories Completed)
-- **Current Stage**: Pre-Production / Core Development
+- **Active Epic**: `epic-hex-grid-engine` (Status: COMPLETE - 3/3 Stories Completed)
+- **Current Stage**: Core Engine / Gameplay Implementation
 - **Review Mode**: Full
 - **Files Created / Modified**:
-  - `src/server/room-manager.ts`
-  - `src/server/server.ts`
-  - `src/server/turn-manager.ts`
-  - `src/server/state-serializer.ts`
-  - `tests/unit/server/websocket_server_test.ts`
-  - `tests/unit/server/turn_manager_test.ts`
-  - `tests/integration/server/state_sync_test.ts`
-- **Test Status**: 9/9 Unit & Integration Tests PASSED (Vitest)
-- **Next Epic**: `epic-hex-grid-engine`
+  - `src/core/hex-math.ts`
+  - `src/core/terrain-matrix.ts`
+  - `src/core/hex-pathfinder.ts`
+  - `tests/unit/core/hex_math_test.ts`
+  - `tests/unit/core/terrain_matrix_test.ts`
+  - `tests/unit/core/hex_pathfinder_test.ts`
+- **Test Status**: 18/18 Unit & Integration Tests PASSED (Vitest)
+- **Next Epic**: `epic-army-combat-resolver`

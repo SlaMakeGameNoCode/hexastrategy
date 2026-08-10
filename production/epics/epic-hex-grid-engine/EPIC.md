@@ -4,11 +4,21 @@
 > **GDD**: [design/gdd/battle-system.md](file:///f:/prototype/hexastreragy/design/gdd/battle-system.md)  
 > **Architecture Module**: HexGridEngine & A* Pathfinder  
 > **Status**: Ready  
-> **Stories**: Not yet created — run `/create-stories epic-hex-grid-engine`  
+> **Stories**: 3 Stories created  
 
 ## Overview
 
 Xây dựng bộ toán bàn cờ Hexagon dựa trên hệ tọa độ Axial ($q, r$), công thức khoảng cách Hex và thuật toán tìm đường ngắn nhất A* có tính đến chi phí địa hình (Đất, Đường, Rừng, Núi,...).
+
+## Stories
+
+| # | Story | Type | Status | ADR |
+|---|-------|------|--------|-----|
+| 001 | [Axial Hex Coordinates & Distance Math](file:///f:/prototype/hexastreragy/production/epics/epic-hex-grid-engine/story-001-axial-hex-coordinates-and-math.md) | Logic | Complete | ADR-0001 |
+| 002 | [Terrain Movement Cost Matrix](file:///f:/prototype/hexastreragy/production/epics/epic-hex-grid-engine/story-002-terrain-movement-cost-matrix.md) | Config/Data | Complete | ADR-0001 |
+| 003 | [A* Hex Pathfinder](file:///f:/prototype/hexastreragy/production/epics/epic-hex-grid-engine/story-003-a-star-hex-pathfinder.md) | Logic | Complete | ADR-0001 |
+
+
 
 ## Governing ADRs
 
