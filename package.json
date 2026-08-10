@@ -1,0 +1,23 @@
+{
+  "name": "hexastrategy",
+  "version": "0.1.0",
+  "description": "HEX LEGION — Turn-based Tactical Hexagon Game",
+  "main": "dist/server/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "server": "tsx src/server/server.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.12",
+    "typescript": "^5.5.0",
+    "vite": "^5.4.0",
+    "vitest": "^2.0.0"
+  }
+}

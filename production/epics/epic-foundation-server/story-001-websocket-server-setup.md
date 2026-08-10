@@ -1,7 +1,7 @@
 # Story 001: WebSocket Server & Room Setup
 
 > **Epic**: Foundation & Server State Engine  
-> **Status**: Ready  
+> **Status**: Complete  
 > **Layer**: Foundation / Core  
 > **Type**: Logic  
 > **Estimate**: 3 hours  
@@ -26,15 +26,15 @@
 
 ## Acceptance Criteria
 
-- [ ] Node.js WebSocket Server boots and accepts incoming client connections.
-- [ ] Server manages 1v1 match creation and registers two player socket connections per room.
-- [ ] Server auto-cleans up disconnected sessions after 2 timeout turns.
+- [x] Node.js WebSocket Server boots and accepts incoming client connections.
+- [x] Server manages 1v1 match creation and registers two player socket connections per room.
+- [x] Server auto-cleans up disconnected sessions after 2 timeout turns.
 
 ---
 
 ## Implementation Notes
 
-- Create TypeScript WebSocket server in `src/server/server.ts` or `src/server/matchmaker.ts`.
+- Create TypeScript WebSocket server in `src/server/server.ts` or `src/server/room-manager.ts`.
 - Maintain `MatchState` object in memory on server side.
 - Emit `match_created` event when 2 clients join room.
 
@@ -54,7 +54,7 @@
 **Story Type**: Logic  
 **Required evidence**: `tests/unit/server/websocket_server_test.ts` — must exist and pass.  
 
-**Status**: [ ] Not yet created  
+**Status**: [x] Passed (3/3 unit tests passing via Vitest)  
 
 ---
 
