@@ -34,8 +34,9 @@ export class Canvas2DRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private offscreenCanvas: HTMLCanvasElement | null = null;
-  private offscreenCtx: CanvasRenderingContext2D | null = null;
   private hexRadius: number = 36;
+  private logicalWidth: number = 800;
+  private logicalHeight: number = 600;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -51,28 +52,38 @@ export class Canvas2DRenderer {
     if (this.canvas && typeof this.canvas.getBoundingClientRect === 'function') {
       const rect = this.canvas.getBoundingClientRect();
       if (rect && rect.width > 0 && rect.height > 0) {
-        this.canvas.width = rect.width * dpr;
-        this.canvas.height = rect.height * dpr;
-        this.ctx.scale(dpr, dpr);
+        if (Math.abs(this.logicalWidth - rect.width) > 1 || Math.abs(this.logicalHeight - rect.height) > 1) {
+          this.logicalWidth = rect.width;
+          this.logicalHeight = rect.height;
+          this.canvas.width = rect.width * dpr;
+          this.canvas.height = rect.height * dpr;
+          this.ctx.scale(dpr, dpr);
+          this.offscreenCanvas = null; // Re-cache on size change
+        }
       }
     }
   }
 
-  public cacheTerrain(tiles: MapTileRenderData[], width: number, height: number): void {
+  public cacheTerrain(tiles: MapTileRenderData[]): void {
+    const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+    const width = this.logicalWidth;
+    const height = this.logicalHeight;
+
     this.offscreenCanvas = document.createElement('canvas');
-    this.offscreenCanvas.width = width;
-    this.offscreenCanvas.height = height;
-    this.offscreenCtx = this.offscreenCanvas.getContext('2d')!;
+    this.offscreenCanvas.width = width * dpr;
+    this.offscreenCanvas.height = height * dpr;
+    const offCtx = this.offscreenCanvas.getContext('2d')!;
+    offCtx.scale(dpr, dpr);
 
     const centerX = width / 2;
     const centerY = height / 2;
 
-    this.offscreenCtx.clearRect(0, 0, width, height);
+    offCtx.clearRect(0, 0, width, height);
 
     for (const tile of tiles) {
       const pos = HexMath.hexToPixel(tile.coord, this.hexRadius);
       this.drawHexagon(
-        this.offscreenCtx,
+        offCtx,
         centerX + pos.x,
         centerY + pos.y,
         this.hexRadius,
@@ -90,19 +101,21 @@ export class Canvas2DRenderer {
     pathPreview?: HexCoord[],
     floatingTexts?: FloatingText[]
   ): void {
-    const width = this.canvas.width;
-    const height = this.canvas.height;
+    this.setupDPI();
+
+    const width = this.logicalWidth;
+    const height = this.logicalHeight;
     const centerX = width / 2;
     const centerY = height / 2;
 
     this.ctx.clearRect(0, 0, width, height);
 
-    // Static Background Terrain
+    // Static Background Terrain Cache
+    if (!this.offscreenCanvas) {
+      this.cacheTerrain(tiles);
+    }
     if (this.offscreenCanvas) {
-      this.ctx.drawImage(this.offscreenCanvas, 0, 0);
-    } else {
-      this.cacheTerrain(tiles, width, height);
-      if (this.offscreenCanvas) this.ctx.drawImage(this.offscreenCanvas, 0, 0);
+      this.ctx.drawImage(this.offscreenCanvas, 0, 0, width, height);
     }
 
     // Highlight Reachable Hexes
@@ -138,7 +151,7 @@ export class Canvas2DRenderer {
 
     // Render Units
     for (const unit of units) {
-      if (unit.hp <= 0) continue; // Dead units hidden
+      if (unit.hp <= 0) continue; // Hide dead units
 
       let px = centerX;
       let py = centerY;
