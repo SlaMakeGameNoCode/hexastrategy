@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HEX LEGION — Hexagonal Tactical Strategy Game</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #090D16;
+      --panel-bg: rgba(15, 23, 42, 0.75);
+      --accent-blue: #3B82F6;
+      --accent-gold: #F59E0B;
+      --accent-red: #EF4444;
+      --accent-green: #10B981;
+      --text-main: #F8FAFC;
+      --text-muted: #94A3B8;
+      --border-glass: rgba(255, 255, 255, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #game-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at center, #1E293B 0%, #0F172A 70%, #090D16 100%);
+    }
+
+    /* HUD Top Bar */
+    .hud-top {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      padding: 12px 28px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-glass);
+      border-radius: 999px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+      z-index: 10;
+    }
+
+    .timer-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .timer-ring {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: conic-gradient(var(--accent-gold) 100%, rgba(255,255,255,0.1) 0%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 0 16px rgba(245, 158, 11, 0.3);
+    }
+
+    .timer-inner {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #0F172A;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      font-size: 16px;
+      color: var(--accent-gold);
+    }
+
+    .ap-container {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 180px;
+    }
+
+    .ap-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .ap-label span:last-child {
+      color: var(--accent-blue);
+      font-weight: 800;
+    }
+
+    .ap-bar-bg {
+      width: 100%;
+      height: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .ap-bar-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #3B82F6 0%, #60A5FA 100%);
+      border-radius: 999px;
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
+    }
+
+    /* Controls Panel Bottom */
+    .controls-panel {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 12px;
+      padding: 12px 20px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-glass);
+      border-radius: 20px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+      z-index: 10;
+    }
+
+    .btn-action {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border-glass);
+      color: var(--text-main);
+      padding: 10px 18px;
+      border-radius: 12px;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-action:hover {
+      background: rgba(255, 255, 255, 0.15);
+      transform: translateY(-2px);
+    }
+
+    .btn-action.primary {
+      background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+      border-color: #3B82F6;
+      box-shadow: 0 4px 16px rgba(37, 99, 235, 0.4);
+    }
+
+    .btn-action.primary:hover {
+      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.6);
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <!-- Top HUD Bar -->
+    <div class="hud-top">
+      <div class="timer-badge">
+        <div class="timer-ring" id="timer-ring">
+          <div class="timer-inner" id="timer-text">10</div>
+        </div>
+      </div>
+      <div class="ap-container">
+        <div class="ap-label">
+          <span>Ngân sách AP</span>
+          <span id="ap-text">10 / 10 AP</span>
+        </div>
+        <div class="ap-bar-bg">
+          <div class="ap-bar-fill" id="ap-fill"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HTML5 Canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Bottom Controls -->
+    <div class="controls-panel">
+      <button class="btn-action" id="btn-move">🚶 Di chuyển (1-3 AP)</button>
+      <button class="btn-action" id="btn-attack">⚔️ Tấn công</button>
+      <button class="btn-action" id="btn-brace">🛡️ Thủ giáo (Brace)</button>
+      <button class="btn-action primary" id="btn-end-turn">🚀 Gửi Lượt (Lock)</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

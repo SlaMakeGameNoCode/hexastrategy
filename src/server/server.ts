@@ -21,9 +21,11 @@ export function createGameServer(port: number): Promise<GameServerInstance> {
           const payload = JSON.parse(message.toString());
 
           if (payload.type === 'JOIN_MATCH') {
-            playerId = payload.playerId || `p_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+            const validPlayerId: string = payload.playerId || `p_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+            playerId = validPlayerId;
+
             const session: PlayerSession = {
-              id: playerId,
+              id: validPlayerId,
               socket: ws,
               joinedAt: Date.now(),
               disconnectedTurns: 0
@@ -35,10 +37,11 @@ export function createGameServer(port: number): Promise<GameServerInstance> {
             ws.send(JSON.stringify({
               type: 'MATCH_JOINED',
               roomId: room.id,
-              playerId,
+              playerId: validPlayerId,
               state: room.state,
               isMatched
             }));
+
 
             if (isMatched && room.player1 && room.player2) {
               const startPayload = JSON.stringify({

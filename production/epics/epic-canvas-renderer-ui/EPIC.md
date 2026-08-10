@@ -4,11 +4,21 @@
 > **GDD**: [design/gdd/battle-system.md](file:///f:/prototype/hexastreragy/design/gdd/battle-system.md)  
 > **Architecture Module**: Canvas2DRenderer & HUDOverlay  
 > **Status**: Ready  
-> **Stories**: Not yet created — run `/create-stories epic-canvas-renderer-ui`  
+> **Stories**: 3 Stories created  
 
 ## Overview
 
 Xây dựng bộ vẽ HTML5 Canvas 2D tốc độ 60 FPS, cache địa hình tĩnh bằng Offscreen Canvas, giao diện xem trước đường đi (Path Preview), đếm ngược 10s và quản lý ngân sách 10 AP trên giao diện UI.
+
+## Stories
+
+| # | Story | Type | Status | ADR |
+|---|-------|------|--------|-----|
+| 001 | [HTML5 Canvas 2D Render Loop & Offscreen Terrain Cache](file:///f:/prototype/hexastreragy/production/epics/epic-canvas-renderer-ui/story-001-html5-canvas-2d-render-loop.md) | UI | Complete | ADR-0004 |
+| 002 | [Hex Pathfinding Hover Preview UI](file:///f:/prototype/hexastreragy/production/epics/epic-canvas-renderer-ui/story-002-hex-pathfinding-hover-preview-ui.md) | Visual/Feel | Complete | ADR-0004 |
+| 003 | [HUD Overlay Timer & AP Bar](file:///f:/prototype/hexastreragy/production/epics/epic-canvas-renderer-ui/story-003-hud-overlay-timer-and-ap-bar.md) | UI | Complete | ADR-0004 |
+
+
 
 ## Governing ADRs
 
