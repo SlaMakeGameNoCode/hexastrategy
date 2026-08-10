@@ -14,9 +14,10 @@ Xây dựng hệ thống Server Authoritative và giao thức mạng WebSocket t
 
 | # | Story | Type | Status | ADR |
 |---|-------|------|--------|-----|
-| 001 | [WebSocket Server & Room Setup](file:///f:/prototype/hexastreragy/production/epics/epic-foundation-server/story-001-websocket-server-setup.md) | Logic | Ready | ADR-0002 |
-| 002 | [Simultaneous Turn Timer & AP Validator](file:///f:/prototype/hexastreragy/production/epics/epic-foundation-server/story-002-simultaneous-turn-timer-and-ap-validator.md) | Logic | Ready | ADR-0002 |
-| 003 | [Match State Serialization & Sync](file:///f:/prototype/hexastreragy/production/epics/epic-foundation-server/story-003-match-state-serialization-and-sync.md) | Integration | Ready | ADR-0002 |
+| 001 | [WebSocket Server & Room Setup](file:///f:/prototype/hexastreragy/production/epics/epic-foundation-server/story-001-websocket-server-setup.md) | Logic | Complete | ADR-0002 |
+| 002 | [Simultaneous Turn Timer & AP Validator](file:///f:/prototype/hexastreragy/production/epics/epic-foundation-server/story-002-simultaneous-turn-timer-and-ap-validator.md) | Logic | Complete | ADR-0002 |
+| 003 | [Match State Serialization & Sync](file:///f:/prototype/hexastreragy/production/epics/epic-foundation-server/story-003-match-state-serialization-and-sync.md) | Integration | Complete | ADR-0002 |
+
 
 
 ## Governing ADRs

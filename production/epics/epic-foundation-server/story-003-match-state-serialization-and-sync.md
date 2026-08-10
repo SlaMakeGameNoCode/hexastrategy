@@ -1,7 +1,7 @@
 # Story 003: Match State Serialization & Sync
 
 > **Epic**: Foundation & Server State Engine  
-> **Status**: Ready  
+> **Status**: Complete  
 > **Layer**: Foundation / Core  
 > **Type**: Integration  
 > **Estimate**: 3 hours  
@@ -25,9 +25,9 @@
 
 ## Acceptance Criteria
 
-- [ ] Server serializes `MatchState` (unit HP, positions, cooldowns, victory status).
-- [ ] Server broadcasts `RoundResolvedPayload` to both room sockets upon resolution.
-- [ ] Client receives state update payload and updates local client model.
+- [x] Server serializes `MatchState` (unit HP, positions, cooldowns, victory status).
+- [x] Server broadcasts `RoundResolvedPayload` to both room sockets upon resolution.
+- [x] Client receives state update payload and updates local client model.
 
 ---
 
@@ -52,7 +52,8 @@
 **Story Type**: Integration  
 **Required evidence**: `tests/integration/server/state_sync_test.ts` — must exist and pass.  
 
-**Status**: [ ] Not yet created  
+**Status**: [x] Passed (2/2 integration tests passing via Vitest)  
+
 
 ---
 
