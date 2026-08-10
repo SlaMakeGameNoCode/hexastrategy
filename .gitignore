@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Temporary files & logs
+.temp_repo/
+*.log
+.DS_Store
+Thumbs.db
