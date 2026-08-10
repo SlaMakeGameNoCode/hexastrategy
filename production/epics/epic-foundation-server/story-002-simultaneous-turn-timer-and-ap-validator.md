@@ -1,7 +1,7 @@
 # Story 002: Simultaneous Turn Timer & AP Validator
 
 > **Epic**: Foundation & Server State Engine  
-> **Status**: Ready  
+> **Status**: Complete  
 > **Layer**: Foundation / Core  
 > **Type**: Logic  
 > **Estimate**: 3 hours  
@@ -26,10 +26,10 @@
 
 ## Acceptance Criteria
 
-- [ ] Server counts down 10 seconds per planning round.
-- [ ] Server validates submitted action payload AP sum ($\le 10 \text{ AP}$).
-- [ ] If client submits $> 10 \text{ AP}$, server rejects the payload with error response.
-- [ ] Upon 10s timer expiration, submitted actions are locked.
+- [x] Server counts down 10 seconds per planning round.
+- [x] Server validates submitted action payload AP sum ($\le 10 \text{ AP}$).
+- [x] If client submits $> 10 \text{ AP}$, server rejects the payload with error response.
+- [x] Upon 10s timer expiration, submitted actions are locked.
 
 ---
 
@@ -55,7 +55,8 @@
 **Story Type**: Logic  
 **Required evidence**: `tests/unit/server/turn_manager_test.ts` — must exist and pass.  
 
-**Status**: [ ] Not yet created  
+**Status**: [x] Passed (4/4 unit tests passing via Vitest)  
+
 
 ---
 
