@@ -1,14 +1,13 @@
 # Active Session State
 
-- **Active Epic**: `epic-hex-grid-engine` (Status: COMPLETE - 3/3 Stories Completed)
+- **Active Epic**: `epic-army-combat-resolver` (Status: COMPLETE - 3/3 Stories Completed)
 - **Current Stage**: Core Engine / Gameplay Implementation
 - **Review Mode**: Full
 - **Files Created / Modified**:
-  - `src/core/hex-math.ts`
-  - `src/core/terrain-matrix.ts`
-  - `src/core/hex-pathfinder.ts`
-  - `tests/unit/core/hex_math_test.ts`
-  - `tests/unit/core/terrain_matrix_test.ts`
-  - `tests/unit/core/hex_pathfinder_test.ts`
-- **Test Status**: 18/18 Unit & Integration Tests PASSED (Vitest)
-- **Next Epic**: `epic-army-combat-resolver`
+  - `src/gameplay/army-registry.ts`
+  - `src/gameplay/combat-resolver.ts`
+  - `tests/unit/gameplay/army_registry_test.ts`
+  - `tests/unit/gameplay/combat_resolver_test.ts`
+  - `tests/unit/gameplay/charge_brace_test.ts`
+- **Test Status**: 24/24 Unit & Integration Tests PASSED (Vitest)
+- **Next Epic**: `epic-canvas-renderer-ui`
