@@ -74,6 +74,7 @@ export class Canvas2DRenderer {
   private cameraShakeMs: number = 0;
   private shakeIntensity: number = 0;
   private vfxManager: VFXManager;
+  private cachedFlipped: boolean | undefined = undefined;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -107,6 +108,7 @@ export class Canvas2DRenderer {
   }
 
   public cacheTerrain(tiles: MapTileRenderData[], isFlipped?: boolean): void {
+    this.cachedFlipped = isFlipped;
     const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
     const width = this.logicalWidth;
     const height = this.logicalHeight;
@@ -441,7 +443,7 @@ export class Canvas2DRenderer {
 
     this.ctx.clearRect(0, 0, width, height);
 
-    if (!this.offscreenCanvas) {
+    if (!this.offscreenCanvas || this.cachedFlipped !== isFlipped) {
       this.cacheTerrain(tiles, isFlipped);
     }
     if (this.offscreenCanvas) {

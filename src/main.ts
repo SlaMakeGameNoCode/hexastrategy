@@ -749,6 +749,7 @@ window.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
+    showPvpWaiting(false);
     if (matchupModal) matchupModal.style.display = 'flex';
     let countdown = 3;
     if (countdownEl) countdownEl.innerText = '3';
