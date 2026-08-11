@@ -122,6 +122,7 @@ window.addEventListener('DOMContentLoaded', () => {
   let selectedUnit: RenderableUnit | null = null;
   let hoveredHex: HexCoord | null = null;
   let currentRound = 1;
+  let isTargetingSkillMode = false;
 
   function updateTileOccupancy() {
     for (const tile of tileMap.values()) {
@@ -147,33 +148,50 @@ window.addEventListener('DOMContentLoaded', () => {
     return tile;
   }
 
-  function updateSkillButtonUI(unit: RenderableUnit | null) {
+  function updateActionButtonsUI(unit: RenderableUnit | null) {
     const btnSkill = document.getElementById('btn-skill');
-    if (!btnSkill) return;
+    const btnBrace = document.getElementById('btn-brace');
 
     if (unit && unit.ownerColor === '#3B82F6') {
       const armyClass = (unit.armyClass || 'SHORT_SPEAR') as ArmyClassId;
       const skillType = SkillResolver.getSkillForClass(armyClass);
       const skillDef = SkillResolver.getSkillDefinition(skillType);
-      btnSkill.innerText = `${skillDef.name} (${skillDef.apCost} AP)`;
-      btnSkill.style.display = 'flex';
+
+      if (btnSkill) {
+        btnSkill.innerText = `${isTargetingSkillMode ? '🎯 Chọn Mục Tiêu...' : skillDef.name + ' (' + skillDef.apCost + ' AP)'}`;
+        btnSkill.style.display = 'flex';
+      }
+
+      // FIX #4: Only show `#btn-brace` if selected unit is a SPEAR unit (SHORT_SPEAR or LONG_SPEAR)!
+      if (btnBrace) {
+        if (armyClass === 'SHORT_SPEAR' || armyClass === 'LONG_SPEAR') {
+          btnBrace.style.display = 'flex';
+        } else {
+          btnBrace.style.display = 'none';
+        }
+      }
     } else {
-      btnSkill.innerText = '🔥 Kỹ Năng Đặc Biệt';
+      if (btnSkill) {
+        btnSkill.innerText = '🔥 Kỹ Năng Đặc Biệt';
+        btnSkill.style.display = 'flex';
+      }
+      if (btnBrace) btnBrace.style.display = 'none'; // Hide brace if no unit selected
     }
   }
 
   function selectUnit(unit: RenderableUnit | null) {
+    isTargetingSkillMode = false;
     if (turnManager.getPhase() !== 'PLANNING') {
       selectedUnit = unit;
       pathOverlay.clearSelection();
-      updateSkillButtonUI(null);
+      updateActionButtonsUI(null);
       return;
     }
     if (unit && (unit.ownerColor !== '#3B82F6' || unit.hasActedThisRound)) return;
 
     selectedUnit = unit;
     updateTileOccupancy();
-    updateSkillButtonUI(unit);
+    updateActionButtonsUI(unit);
 
     if (unit) {
       const armyClassId = (unit.armyClass || (unit.category === 'INFANTRY' ? 'SHORT_SPEAR' : unit.category === 'CAVALRY' ? 'HEAVY_CAVALRY' : 'LONGBOW')) as ArmyClassId;
@@ -222,7 +240,7 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Execute Turn Resolution Phase (Smooth Animations & Flying Projectile VFX)
+  // Execute Turn Resolution Phase
   async function resolveRoundPhase() {
     if (turnManager.getPhase() === 'RESOLUTION') return;
     turnManager.setPhase('RESOLUTION');
@@ -249,7 +267,7 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
         if (closestTarget) {
-          const stats = ArmyRegistry.getStats((u.armyClass || (u.category === 'INFANTRY' ? 'SHORT_SPEAR' : u.category === 'CAVALRY' ? 'HEAVY_CAVALRY' : 'LONGBOW')) as ArmyClassId);
+          const stats = ArmyRegistry.getStats((u.armyClass || 'SHORT_SPEAR') as ArmyClassId);
 
           if (minDistance <= stats.range) {
             u.assignedAction = {
@@ -288,7 +306,6 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Helper function to execute team turn (Movement then Combat & Skill VFX)
     const executeTeamTurn = async (teamUnits: RenderableUnit[]) => {
       // 1. Movement Phase
       for (const u of teamUnits) {
@@ -345,7 +362,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
       await new Promise((r) => setTimeout(r, 200));
 
-      // 2. Combat & Active Skill Phase with Animated Flying VFX Projectiles
+      // 2. Combat & Skill Execution Phase
       for (const u of teamUnits) {
         if (u.hp <= 0) continue;
         const action = u.assignedAction;
@@ -360,27 +377,59 @@ window.addEventListener('DOMContentLoaded', () => {
 
         const attackerClass = (u.armyClass || 'SHORT_SPEAR') as ArmyClassId;
 
-        // EXECUTE SKILL ACTION
+        // EXECUTE ACTIVE SKILL
         if (action.type === 'SKILL' && action.skillType) {
           const sType = action.skillType as SkillType;
           const startPx = HexMath.hexToPixel(u.position, renderer.getHexRadius());
           const targetPx = action.targetHex ? HexMath.hexToPixel(action.targetHex, renderer.getHexRadius()) : startPx;
 
-          let projType: ProjectileType = 'FIRE_ARROW';
-          if (attackerClass.includes('CROSSBOW')) projType = 'CROSSBOW_BOLT';
-          else if (attackerClass === 'CATAPULT') projType = 'CATAPULT_BOULDER';
-          else if (attackerClass.includes('SPEAR')) projType = 'SLASH_WAVE';
-          else if (attackerClass === 'GREATSWORD') projType = 'WHIRLWIND_SWEEP';
+          // FIX #3: CAVALRY CHARGE SQUAD DASH (No Arrow Projectile!)
+          if (sType === 'CAVALRY_CHARGE' && action.targetHex) {
+            u.isMoving = true;
+            const pFrom = HexMath.hexToPixel(u.position, renderer.getHexRadius());
+            const pTo = HexMath.hexToPixel(action.targetHex, renderer.getHexRadius());
+            const dx = pTo.x - pFrom.x;
+            const dy = pTo.y - pFrom.y;
+            const angle = Math.atan2(dy, dx);
 
-          // Self Buff Aura Skills (Shield Wall / Spear Wall)
-          if (sType === 'SHIELD_WALL_DEFENSE' || sType === 'SPEAR_WALL') {
-            renderer.getVFXManager().spawnShieldAura(startPx.x, startPx.y);
+            // Fast Wind Dash
+            for (let f = 1; f <= 16; f++) {
+              const t = f / 16;
+              u.animPos = {
+                x: pFrom.x + dx * t,
+                y: pFrom.y + dy * t
+              };
+              renderer.getVFXManager().spawnCavalryWindTrail(u.animPos.x, u.animPos.y, angle);
+              await new Promise((r) => setTimeout(r, 14));
+            }
+
+            u.position = { ...action.targetHex };
+            delete u.animPos;
+            u.isMoving = false;
+            updateTileOccupancy();
+
+            if (targetUnit) {
+              const skillRes = SkillResolver.executeSkill(attackerClass, sType, u.position, action.targetHex, ArmyRegistry.getStats((targetUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId).defense);
+              targetUnit.hp = Math.max(0, targetUnit.hp - skillRes.primaryDamage);
+              const pos = HexMath.hexToPixel(targetUnit.position, renderer.getHexRadius());
+              floatingTexts.push({ x: pos.x, y: pos.y - 30, text: `-${skillRes.primaryDamage} CHARGE!`, color: '#EF4444', alpha: 1.0 });
+              renderer.triggerScreenShake(14, 400);
+              renderer.getVFXManager().spawnExplosion(pos.x, pos.y, '#EF4444', 30);
+            }
+            await new Promise((r) => setTimeout(r, 300));
+          }
+          // FIX #4: SPEAR WALL / SHIELD WALL (Solid Diamond/Triangle Phalanx Shield Barrier)
+          else if (sType === 'SPEAR_WALL' || sType === 'SHIELD_WALL_DEFENSE') {
             const pos = HexMath.hexToPixel(u.position, renderer.getHexRadius());
-            floatingTexts.push({ x: pos.x, y: pos.y - 30, text: sType === 'SHIELD_WALL_DEFENSE' ? '+80% DEF!' : 'SPEAR WALL!', color: '#38BDF8', alpha: 1.0 });
+            renderer.getVFXManager().spawnDiamondPhalanxBarrier(pos.x, pos.y);
+            floatingTexts.push({ x: pos.x, y: pos.y - 30, text: sType === 'SPEAR_WALL' ? 'SPEAR PHALANX!' : '+80% DEF!', color: '#F59E0B', alpha: 1.0 });
             await new Promise((r) => setTimeout(r, 400));
-          } else {
-            // Ranged / Area Skill Flying Projectile VFX
+          }
+          // FIX #2: ARCHER VOLLEY FIRE ARROWS & BURNING FLAME GROUND
+          else {
+            let projType: ProjectileType = sType === 'FIRE_ARROW' ? 'FIRE_ARROW' : (attackerClass.includes('CROSSBOW') ? 'CROSSBOW_BOLT' : 'CATAPULT_BOULDER');
             let projFinished = false;
+
             renderer.getVFXManager().spawnProjectile(startPx.x, startPx.y, targetPx.x, targetPx.y, projType, () => {
               projFinished = true;
             });
@@ -397,11 +446,11 @@ window.addEventListener('DOMContentLoaded', () => {
               floatingTexts.push({ x: pos.x, y: pos.y - 30, text: `-${skillRes.primaryDamage} ${skillRes.appliedStatus || 'SKILL!'}`, color: '#F59E0B', alpha: 1.0 });
             }
 
-            renderer.triggerScreenShake(12, 350);
+            renderer.triggerScreenShake(10, 300);
             await new Promise((r) => setTimeout(r, 300));
           }
         }
-        // REGULAR ATTACK ACTION
+        // REGULAR ATTACK
         else if (action.type === 'ATTACK' && targetUnit && targetUnit.hp > 0) {
           const dist = HexMath.getDistance(u.position, targetUnit.position);
           const stats = ArmyRegistry.getStats(attackerClass);
@@ -410,7 +459,6 @@ window.addEventListener('DOMContentLoaded', () => {
             const attackerPos = HexMath.hexToPixel(u.position, renderer.getHexRadius());
             const targetPos = HexMath.hexToPixel(targetUnit.position, renderer.getHexRadius());
 
-            // Spawn Flying Projectile VFX originating from attacker to target
             let projType: ProjectileType = u.category === 'ARCHER' ? 'FIRE_ARROW' : 'SLASH_WAVE';
             if (attackerClass.includes('CROSSBOW')) projType = 'CROSSBOW_BOLT';
             else if (attackerClass === 'CATAPULT') projType = 'CATAPULT_BOULDER';
@@ -446,15 +494,12 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     };
 
-    // EXECUTE FULL PLAYER A TURN FIRST
     await executeTeamTurn(playerUnits);
     await new Promise((r) => setTimeout(r, 400));
 
-    // EXECUTE FULL PLAYER B / BOT TURN SECOND
     await executeTeamTurn(botUnits);
     await new Promise((r) => setTimeout(r, 400));
 
-    // CHECK VICTORY / DEFEAT CONDITIONS
     const playerAlive = units.some(u => u.ownerColor === '#3B82F6' && u.hp > 0);
     const enemyAlive = units.some(u => u.ownerColor === '#EF4444' && u.hp > 0);
 
@@ -508,6 +553,7 @@ window.addEventListener('DOMContentLoaded', () => {
     hoveredHex = getCanvasHex(evt);
   });
 
+  // FIX #1: INTERACTIVE TARGETING MODE WHEN SKILL BUTTON IS CLICKED
   canvas.addEventListener('click', (evt) => {
     const clickedHex = getCanvasHex(evt);
 
@@ -549,6 +595,28 @@ window.addEventListener('DOMContentLoaded', () => {
     const clickedUnit = units.find(
       (u) => u.hp > 0 && u.position.q === clickedHex.q && u.position.r === clickedHex.r
     );
+
+    // IF IN SKILL TARGETING MODE -> Click hex/enemy to confirm target!
+    if (isTargetingSkillMode && selectedUnit && !selectedUnit.hasActedThisRound) {
+      const armyClass = (selectedUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId;
+      const skillType = SkillResolver.getSkillForClass(armyClass);
+      const skillDef = SkillResolver.getSkillDefinition(skillType);
+
+      if (hud.getAPRemaining() >= skillDef.apCost) {
+        selectedUnit.assignedAction = {
+          type: 'SKILL',
+          skillType,
+          targetHex: { ...clickedHex },
+          targetUnitId: clickedUnit?.id,
+          cost: skillDef.apCost
+        };
+        selectedUnit.hasActedThisRound = true;
+        selectUnit(null);
+        updateAPBudget();
+      }
+      isTargetingSkillMode = false;
+      return;
+    }
 
     // 1. Click on Unacted Player Unit -> Select it
     if (clickedUnit && clickedUnit.ownerColor === '#3B82F6') {
@@ -602,7 +670,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // UI Skill Button Event Listener
+  // UI Skill Button Event Listener: Toggle Targeting Mode or Instant Self-Buff
   document.getElementById('btn-skill')?.addEventListener('click', () => {
     if (selectedUnit && selectedUnit.ownerColor === '#3B82F6' && !selectedUnit.hasActedThisRound && turnManager.getPhase() === 'PLANNING') {
       const armyClass = (selectedUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId;
@@ -610,18 +678,22 @@ window.addEventListener('DOMContentLoaded', () => {
       const skillDef = SkillResolver.getSkillDefinition(skillType);
 
       if (hud.getAPRemaining() >= skillDef.apCost) {
-        // Find closest enemy target if target required
-        const enemyTarget = units.find(u => u.ownerColor === '#EF4444' && u.hp > 0);
-        selectedUnit.assignedAction = {
-          type: 'SKILL',
-          skillType,
-          targetHex: enemyTarget ? { ...enemyTarget.position } : { ...selectedUnit.position },
-          targetUnitId: enemyTarget?.id,
-          cost: skillDef.apCost
-        };
-        selectedUnit.hasActedThisRound = true;
-        selectUnit(null);
-        updateAPBudget();
+        // Self-buff skills execute immediately (Spear Wall / Shield Wall)
+        if (skillType === 'SPEAR_WALL' || skillType === 'SHIELD_WALL_DEFENSE') {
+          selectedUnit.assignedAction = {
+            type: 'SKILL',
+            skillType,
+            targetHex: { ...selectedUnit.position },
+            cost: skillDef.apCost
+          };
+          selectedUnit.hasActedThisRound = true;
+          selectUnit(null);
+          updateAPBudget();
+        } else {
+          // Targeted Skills: Toggle Interactive Targeting Mode
+          isTargetingSkillMode = true;
+          updateActionButtonsUI(selectedUnit);
+        }
       }
     }
   });
