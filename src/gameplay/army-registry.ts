@@ -21,7 +21,7 @@ export interface ArmyStats {
   hp: number;
   attack: number;
   defense: number;
-  actionCost: number; // AP
+  actionCost: number; // AP Cost
   movementPoints: number; // MP
   range: number;
   initiative: number;
@@ -30,18 +30,18 @@ export interface ArmyStats {
 
 export class ArmyRegistry {
   private static readonly STATS: Record<ArmyClassId, ArmyStats> = {
-    SHORT_SPEAR: { id: 'SHORT_SPEAR', name: 'Short Spear', category: 'INFANTRY', hp: 100, attack: 24, defense: 18, actionCost: 1, movementPoints: 3, range: 1, initiative: 5, cooldownTurns: 0 },
-    LONG_SPEAR: { id: 'LONG_SPEAR', name: 'Long Spear', category: 'INFANTRY', hp: 120, attack: 28, defense: 22, actionCost: 2, movementPoints: 2, range: 1, initiative: 4, cooldownTurns: 1 },
-    SWORD_SHIELD: { id: 'SWORD_SHIELD', name: 'Sword & Shield', category: 'INFANTRY', hp: 130, attack: 26, defense: 25, actionCost: 2, movementPoints: 3, range: 1, initiative: 6, cooldownTurns: 0 },
-    GREATSWORD: { id: 'GREATSWORD', name: 'Greatsword', category: 'INFANTRY', hp: 110, attack: 38, defense: 15, actionCost: 2, movementPoints: 2, range: 1, initiative: 7, cooldownTurns: 1 },
-    LIGHT_CAVALRY: { id: 'LIGHT_CAVALRY', name: 'Light Cavalry', category: 'CAVALRY', hp: 110, attack: 32, defense: 16, actionCost: 2, movementPoints: 4, range: 1, initiative: 9, cooldownTurns: 0 },
-    HEAVY_CAVALRY: { id: 'HEAVY_CAVALRY', name: 'Heavy Cavalry', category: 'CAVALRY', hp: 150, attack: 48, defense: 30, actionCost: 3, movementPoints: 3, range: 1, initiative: 8, cooldownTurns: 2 },
-    HORSE_ARCHER: { id: 'HORSE_ARCHER', name: 'Horse Archer', category: 'CAVALRY', hp: 90, attack: 30, defense: 12, actionCost: 3, movementPoints: 4, range: 3, initiative: 9, cooldownTurns: 1 },
-    SHORT_BOW: { id: 'SHORT_BOW', name: 'Short Bow', category: 'ARCHER', hp: 80, attack: 28, defense: 10, actionCost: 1, movementPoints: 2, range: 3, initiative: 6, cooldownTurns: 0 },
-    LONGBOW: { id: 'LONGBOW', name: 'Longbow', category: 'ARCHER', hp: 70, attack: 38, defense: 10, actionCost: 2, movementPoints: 2, range: 4, initiative: 5, cooldownTurns: 1 },
-    CROSSBOW: { id: 'CROSSBOW', name: 'Crossbow', category: 'ARCHER', hp: 85, attack: 42, defense: 14, actionCost: 2, movementPoints: 2, range: 3, initiative: 4, cooldownTurns: 1 },
-    HEAVY_CROSSBOW: { id: 'HEAVY_CROSSBOW', name: 'Heavy Crossbow', category: 'ARCHER', hp: 90, attack: 52, defense: 16, actionCost: 3, movementPoints: 1, range: 3, initiative: 3, cooldownTurns: 2 },
-    CATAPULT: { id: 'CATAPULT', name: 'Catapult', category: 'ARCHER', hp: 60, attack: 65, defense: 5, actionCost: 3, movementPoints: 1, range: 5, initiative: 1, cooldownTurns: 3 }
+    SHORT_SPEAR: { id: 'SHORT_SPEAR', name: 'Giáo Ngắn', category: 'INFANTRY', hp: 100, attack: 25, defense: 20, actionCost: 1, movementPoints: 2, range: 1, initiative: 4, cooldownTurns: 0 },
+    LONG_SPEAR: { id: 'LONG_SPEAR', name: 'Giáo Dài', category: 'INFANTRY', hp: 110, attack: 28, defense: 25, actionCost: 1, movementPoints: 2, range: 1, initiative: 6, cooldownTurns: 1 },
+    SWORD_SHIELD: { id: 'SWORD_SHIELD', name: 'Kiếm Khiên', category: 'INFANTRY', hp: 130, attack: 22, defense: 40, actionCost: 1, movementPoints: 2, range: 1, initiative: 3, cooldownTurns: 0 },
+    GREATSWORD: { id: 'GREATSWORD', name: 'Đại Kiếm', category: 'INFANTRY', hp: 140, attack: 45, defense: 30, actionCost: 2, movementPoints: 2, range: 1, initiative: 5, cooldownTurns: 1 },
+    LIGHT_CAVALRY: { id: 'LIGHT_CAVALRY', name: 'Khinh Kỵ', category: 'CAVALRY', hp: 120, attack: 32, defense: 15, actionCost: 2, movementPoints: 4, range: 1, initiative: 8, cooldownTurns: 0 },
+    HEAVY_CAVALRY: { id: 'HEAVY_CAVALRY', name: 'Trọng Kỵ', category: 'CAVALRY', hp: 160, attack: 42, defense: 35, actionCost: 3, movementPoints: 3, range: 1, initiative: 7, cooldownTurns: 2 },
+    HORSE_ARCHER: { id: 'HORSE_ARCHER', name: 'Kỵ Cung', category: 'CAVALRY', hp: 90, attack: 26, defense: 10, actionCost: 2, movementPoints: 4, range: 3, initiative: 9, cooldownTurns: 1 },
+    SHORT_BOW: { id: 'SHORT_BOW', name: 'Cung Ngắn', category: 'ARCHER', hp: 70, attack: 20, defense: 5, actionCost: 1, movementPoints: 3, range: 3, initiative: 7, cooldownTurns: 0 },
+    LONGBOW: { id: 'LONGBOW', name: 'Cung Dài', category: 'ARCHER', hp: 80, attack: 30, defense: 10, actionCost: 2, movementPoints: 2, range: 4, initiative: 5, cooldownTurns: 1 },
+    CROSSBOW: { id: 'CROSSBOW', name: 'Nỏ Thủ', category: 'ARCHER', hp: 85, attack: 35, defense: 15, actionCost: 1, movementPoints: 2, range: 3, initiative: 4, cooldownTurns: 1 },
+    HEAVY_CROSSBOW: { id: 'HEAVY_CROSSBOW', name: 'Nỏ Nặng', category: 'ARCHER', hp: 95, attack: 48, defense: 20, actionCost: 2, movementPoints: 2, range: 3, initiative: 2, cooldownTurns: 2 },
+    CATAPULT: { id: 'CATAPULT', name: 'Mãng Pháo', category: 'ARCHER', hp: 150, attack: 60, defense: 25, actionCost: 3, movementPoints: 1, range: 5, initiative: 1, cooldownTurns: 3 }
   };
 
   public static getStats(id: ArmyClassId): ArmyStats {

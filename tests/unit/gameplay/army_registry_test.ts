@@ -5,15 +5,16 @@ describe('ArmyRegistry Unit Tests', () => {
   it('test_retrieves_stats_for_all_12_armies', () => {
     const spear = ArmyRegistry.getStats('SHORT_SPEAR');
     expect(spear.actionCost).toBe(1);
-    expect(spear.movementPoints).toBe(3);
+    expect(spear.movementPoints).toBe(2);
 
     const heavyCav = ArmyRegistry.getStats('HEAVY_CAVALRY');
     expect(heavyCav.actionCost).toBe(3);
     expect(heavyCav.movementPoints).toBe(3);
-    expect(heavyCav.hp).toBe(150);
+    expect(heavyCav.hp).toBe(160);
 
     const longbow = ArmyRegistry.getStats('LONGBOW');
     expect(longbow.range).toBe(4);
+    expect(longbow.actionCost).toBe(2);
   });
 
   it('test_counter_matrix_multipliers', () => {
