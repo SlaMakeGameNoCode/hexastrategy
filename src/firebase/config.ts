@@ -2,14 +2,15 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 
-// Default Firebase Configuration (Can be overridden via window.FIREBASE_CONFIG or process.env)
+// Your Real Firebase App Configuration (Project: chess-780ea)
 const firebaseConfig = (typeof window !== 'undefined' && (window as any).FIREBASE_CONFIG) || {
-  apiKey: "AIzaSyDemoHexStrategyKeyForAuthPvP",
-  authDomain: "hex-strategy-pvp.firebaseapp.com",
-  projectId: "hex-strategy-pvp",
-  storageBucket: "hex-strategy-pvp.appspot.com",
-  messagingSenderId: "1234567890",
-  appId: "1:1234567890:web:hexstrategypvpdemo"
+  apiKey: "AIzaSyAuLfa1iA1QttbsMi8qYgwr0bsvoFPSE4s",
+  authDomain: "chess-780ea.firebaseapp.com",
+  projectId: "chess-780ea",
+  storageBucket: "chess-780ea.firebasestorage.app",
+  messagingSenderId: "826100527837",
+  appId: "1:826100527837:web:189ecdcf9b6f82864f6134",
+  measurementId: "G-MP9LV5NTGB"
 };
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
