@@ -1,5 +1,6 @@
 import { HexMath, HexCoord } from '../core/hex-math.js';
 import { TerrainType } from '../core/terrain-matrix.js';
+import { VFXManager } from './vfx-manager.js';
 
 export interface RenderableUnit {
   id: string;
@@ -20,9 +21,10 @@ export interface RenderableUnit {
   ownerColor: string;
   hasActedThisRound?: boolean;
   assignedAction?: {
-    type: 'MOVE' | 'ATTACK' | 'BRACE';
+    type: 'MOVE' | 'ATTACK' | 'BRACE' | 'SKILL';
     targetHex?: HexCoord;
     targetUnitId?: string;
+    skillType?: string;
     cost: number;
   };
 }
@@ -63,15 +65,22 @@ export class Canvas2DRenderer {
   private particles: VFXParticle[] = [];
   private cameraShakeMs: number = 0;
   private shakeIntensity: number = 0;
+  private vfxManager: VFXManager;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Could not acquire Canvas 2D context');
     this.ctx = context;
+    this.vfxManager = new VFXManager();
 
     this.setupDPI();
   }
+
+  public getVFXManager(): VFXManager {
+    return this.vfxManager;
+  }
+
 
   public setupDPI(): void {
     const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
@@ -242,6 +251,9 @@ export class Canvas2DRenderer {
       }
     }
 
+    // Render Flying VFX Projectiles & Particle Effects Layer
+    this.vfxManager.updateAndRender(this.ctx, centerX, centerY);
+
     // Floating Text Popups
     if (floatingTexts) {
       for (const ft of floatingTexts) {
@@ -254,6 +266,7 @@ export class Canvas2DRenderer {
         this.ctx.restore();
       }
     }
+
   }
 
   private drawUnit(ctx: CanvasRenderingContext2D, x: number, y: number, unit: RenderableUnit, isSelected: boolean): void {

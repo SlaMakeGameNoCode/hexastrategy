@@ -1,0 +1,58 @@
+import { describe, it, expect } from 'vitest';
+import { SkillResolver } from '../../../src/gameplay/skill-resolver.js';
+
+describe('SkillResolver Unit Tests', () => {
+  it('test_fire_arrow_applies_burn_status', () => {
+    const res = SkillResolver.executeSkill(
+      'LONGBOW',
+      'FIRE_ARROW',
+      { q: 0, r: 0 },
+      { q: 3, r: 0 },
+      10
+    );
+
+    expect(res.skillType).toBe('FIRE_ARROW');
+    expect(res.appliedStatus).toBe('BURN');
+    expect(res.primaryDamage).toBeGreaterThan(30);
+  });
+
+  it('test_armor_pierce_bolt_ignores_seventy_percent_def', () => {
+    const resNormal = SkillResolver.executeSkill(
+      'CROSSBOW',
+      'ARMOR_PIERCE_BOLT',
+      { q: 0, r: 0 },
+      { q: 2, r: 0 },
+      40
+    );
+
+    expect(resNormal.skillType).toBe('ARMOR_PIERCE_BOLT');
+    expect(resNormal.affectedHexes.length).toBe(2); // Pierces to 2nd hex
+  });
+
+  it('test_cavalry_charge_deals_double_damage_and_knockback', () => {
+    const res = SkillResolver.executeSkill(
+      'HEAVY_CAVALRY',
+      'CAVALRY_CHARGE',
+      { q: 0, r: 0 },
+      { q: 1, r: 0 },
+      20
+    );
+
+    expect(res.skillType).toBe('CAVALRY_CHARGE');
+    expect(res.appliedStatus).toBe('KNOCKBACK');
+    expect(res.primaryDamage).toBeGreaterThan(60);
+  });
+
+  it('test_whirlwind_slash_affects_all_six_neighbors', () => {
+    const res = SkillResolver.executeSkill(
+      'GREATSWORD',
+      'WHIRLWIND_SLASH',
+      { q: 0, r: 0 },
+      { q: 1, r: 0 },
+      15
+    );
+
+    expect(res.skillType).toBe('WHIRLWIND_SLASH');
+    expect(res.affectedHexes.length).toBe(6);
+  });
+});
