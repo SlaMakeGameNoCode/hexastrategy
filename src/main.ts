@@ -650,8 +650,9 @@ window.addEventListener('DOMContentLoaded', () => {
   function updateActionButtonsUI(unit: RenderableUnit | null) {
     const btnSkill = document.getElementById('btn-skill');
     const planControls = document.getElementById('planning-controls');
+    const myColor = pvpMode ? myPvpColor : '#3B82F6';
 
-    if (unit && unit.ownerColor === '#3B82F6') {
+    if (unit && unit.ownerColor === myColor) {
       const armyClass = (unit.armyClass || 'SHORT_SPEAR') as ArmyClassId;
       const skillType = SkillResolver.getSkillForClass(armyClass);
       const skillDef = SkillResolver.getSkillDefinition(skillType);
@@ -687,7 +688,8 @@ window.addEventListener('DOMContentLoaded', () => {
       updateActionButtonsUI(null);
       return;
     }
-    if (unit && unit.ownerColor !== '#3B82F6') return;
+    const myColor = pvpMode ? myPvpColor : '#3B82F6';
+    if (unit && unit.ownerColor !== myColor) return;
 
     updateTileOccupancy();
     updateActionButtonsUI(unit);
@@ -714,8 +716,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function updateAPBudget() {
     let usedAP = 0;
+    const myColor = pvpMode ? myPvpColor : '#3B82F6';
     for (const u of units) {
-      if (u.ownerColor === '#3B82F6' && u.assignedAction) {
+      if (u.ownerColor === myColor && u.assignedAction) {
         usedAP += u.assignedAction.cost;
       }
     }
@@ -775,7 +778,7 @@ window.addEventListener('DOMContentLoaded', () => {
   function pvpTryResolve(): void {
     if (!pvpMyActionsSubmitted) return;
     if (!pvpOpponentActionsBuffer) {
-      showPvpWaiting(true);
+      // FIX STORY-005: Do NOT show waiting modal inside battle! Keep playing interface clean
       return;
     }
     // Apply opponent's planned actions to their units
