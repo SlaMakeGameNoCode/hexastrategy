@@ -2,7 +2,7 @@
   "name": "hexastrategy",
   "version": "0.1.0",
   "description": "HEX LEGION — Turn-based Tactical Hexagon Game",
-  "main": "dist/server/server.js",
+  "main": "server.js",
   "type": "module",
   "scripts": {
     "dev": "vite",
