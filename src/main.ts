@@ -1,6 +1,6 @@
 import { Canvas2DRenderer, MapTileRenderData, RenderableUnit, FloatingText } from './ui/canvas-renderer.js';
 import { HexMath, HexCoord } from './core/hex-math.js';
-import { TerrainType, TerrainMatrix, UnitCategory } from './core/terrain-matrix.js';
+import { TerrainType, TerrainMatrix } from './core/terrain-matrix.js';
 import { HexPathfinder, MapHexTile } from './core/hex-pathfinder.js';
 import { PathPreviewOverlay } from './ui/path-preview-overlay.js';
 import { HUDOverlay } from './ui/hud-overlay.js';
@@ -22,50 +22,69 @@ window.addEventListener('DOMContentLoaded', () => {
 
   const floatingTexts: FloatingText[] = [];
 
-  // Fixed Hex Map Grid (-6 to +6 radius = 127 Hexes)
+  // Rectangular Hex Map Grid (15 Columns Wide x 13 Rows Tall)
   const mapTiles: MapTileRenderData[] = [];
   const tileMap = new Map<string, MapHexTile>();
 
-  for (let q = -6; q <= 6; q++) {
+  function generateProceduralMap() {
+    mapTiles.length = 0;
+    tileMap.clear();
+
     for (let r = -6; r <= 6; r++) {
-      if (Math.abs(q + r) <= 6) {
+      for (let col = -7; col <= 7; col++) {
+        const q = col - Math.floor(r / 2);
         let terrain: TerrainType = 'GROUND';
 
-        if ((q === 0 && r === 0) || (q === -3 && r === 0) || (q === 3 && r === 0)) terrain = 'HIGH_GROUND';
-        else if ((q === 2 && r === -4) || (q === 1 && r === -3) || (q === -2 && r === 3) || (q === -1 && r === 3) || (q === 4 && r === -2)) terrain = 'FOREST';
-        else if (q === 0 || r === 0 || q + r === 0) terrain = 'ROAD';
-        else if ((q === -4 && r === 2) || (q === 4 && r === -5) || (q === -3 && r === 5)) terrain = 'RUINS';
-        else if ((q === 3 && r === 2) || (q === -3 && r === -2) || (q === 5 && r === -3) || (q === -5 && r === 3)) terrain = 'MOUNTAIN';
+        // Procedural terrain distribution
+        if ((r === 0 || r === 1) && Math.abs(col) <= 6) {
+          terrain = 'ROAD';
+        } else if ((r === -2 || r === 2) && Math.abs(col) === 0) {
+          terrain = 'HIGH_GROUND';
+        } else if ((r === -4 && Math.abs(col) <= 2) || (r === 4 && Math.abs(col) <= 2)) {
+          terrain = 'HIGH_GROUND';
+        } else if ((r === -3 && (col === -4 || col === 4)) || (r === 3 && (col === -4 || col === 4))) {
+          terrain = 'FOREST';
+        } else if ((r === -1 && (col === -5 || col === 5)) || (r === 1 && (col === -5 || col === 5))) {
+          terrain = 'FOREST';
+        } else if ((r === -2 && (col === -3 || col === 3)) || (r === 2 && (col === -3 || col === 3))) {
+          terrain = 'RUINS';
+        } else if (Math.abs(col) === 7) {
+          terrain = 'MOUNTAIN';
+        } else if (Math.abs(col) === 6 && (r === -5 || r === 5 || r === 0)) {
+          terrain = 'WATER';
+        }
 
-        const tileData: MapTileRenderData = { coord: { q, r }, terrain };
-        mapTiles.push(tileData);
-        tileMap.set(HexPathfinder.hexKey({ q, r }), { coord: { q, r }, terrain, blockedByUnit: false });
+        const coord: HexCoord = { q, r };
+        mapTiles.push({ coord, terrain });
+        tileMap.set(HexPathfinder.hexKey(coord), { coord, terrain, blockedByUnit: false });
       }
     }
   }
 
-  // Pre-deployed 8 Units Roster (4 Melee, 4 Ranged) for Player & Enemy
+  generateProceduralMap();
+
+  // Pre-deployed 8 Units Roster (4 Melee, 4 Ranged) for Player & Enemy inside Rectangular Map
   function createDefaultUnits(): RenderableUnit[] {
     const playerRoster: { classId: ArmyClassId; pos: HexCoord }[] = [
-      { classId: 'SHORT_SPEAR', pos: { q: -3, r: 5 } },
-      { classId: 'SHORT_SPEAR', pos: { q: 3, r: 5 } },
-      { classId: 'LONG_SPEAR', pos: { q: 0, r: 5 } },
-      { classId: 'SWORD_SHIELD', pos: { q: -1, r: 5 } },
-      { classId: 'SHORT_BOW', pos: { q: -2, r: 6 } },
-      { classId: 'SHORT_BOW', pos: { q: 2, r: 6 } },
-      { classId: 'CROSSBOW', pos: { q: -4, r: 6 } },
-      { classId: 'CROSSBOW', pos: { q: 4, r: 6 } }
+      { classId: 'SHORT_SPEAR', pos: { q: -4 - Math.floor(5 / 2), r: 5 } }, // col = -4 -> q = -6
+      { classId: 'SWORD_SHIELD', pos: { q: -1 - Math.floor(5 / 2), r: 5 } }, // col = -1 -> q = -3
+      { classId: 'LONG_SPEAR', pos: { q: 1 - Math.floor(5 / 2), r: 5 } },   // col = 1 -> q = -1
+      { classId: 'SHORT_SPEAR', pos: { q: 4 - Math.floor(5 / 2), r: 5 } },  // col = 4 -> q = 2
+      { classId: 'CROSSBOW', pos: { q: -5 - Math.floor(6 / 2), r: 6 } },    // col = -5 -> q = -8
+      { classId: 'SHORT_BOW', pos: { q: -2 - Math.floor(6 / 2), r: 6 } },   // col = -2 -> q = -5
+      { classId: 'SHORT_BOW', pos: { q: 2 - Math.floor(6 / 2), r: 6 } },    // col = 2 -> q = -1
+      { classId: 'CROSSBOW', pos: { q: 5 - Math.floor(6 / 2), r: 6 } }      // col = 5 -> q = 2
     ];
 
     const enemyRoster: { classId: ArmyClassId; pos: HexCoord }[] = [
-      { classId: 'SHORT_SPEAR', pos: { q: -3, r: -5 } },
-      { classId: 'SHORT_SPEAR', pos: { q: 3, r: -5 } },
-      { classId: 'LONG_SPEAR', pos: { q: 0, r: -5 } },
-      { classId: 'SWORD_SHIELD', pos: { q: 1, r: -5 } },
-      { classId: 'SHORT_BOW', pos: { q: -2, r: -6 } },
-      { classId: 'SHORT_BOW', pos: { q: 2, r: -6 } },
-      { classId: 'CROSSBOW', pos: { q: -4, r: -6 } },
-      { classId: 'CROSSBOW', pos: { q: 4, r: -6 } }
+      { classId: 'SHORT_SPEAR', pos: { q: -4 - Math.floor(-5 / 2), r: -5 } }, // col = -4 -> q = -1
+      { classId: 'SWORD_SHIELD', pos: { q: -1 - Math.floor(-5 / 2), r: -5 } }, // col = -1 -> q = 2
+      { classId: 'LONG_SPEAR', pos: { q: 1 - Math.floor(-5 / 2), r: -5 } },   // col = 1 -> q = 4
+      { classId: 'SHORT_SPEAR', pos: { q: 4 - Math.floor(-5 / 2), r: -5 } },  // col = 4 -> q = 7
+      { classId: 'CROSSBOW', pos: { q: -5 - Math.floor(-6 / 2), r: -6 } },    // col = -5 -> q = -2
+      { classId: 'SHORT_BOW', pos: { q: -2 - Math.floor(-6 / 2), r: -6 } },   // col = -2 -> q = 1
+      { classId: 'SHORT_BOW', pos: { q: 2 - Math.floor(-6 / 2), r: -6 } },    // col = 2 -> q = 5
+      { classId: 'CROSSBOW', pos: { q: 5 - Math.floor(-6 / 2), r: -6 } }      // col = 5 -> q = 8
     ];
 
     const result: RenderableUnit[] = [];
@@ -104,7 +123,6 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   const units: RenderableUnit[] = createDefaultUnits();
-  let selectedDeckClass: ArmyClassId = 'SHORT_SPEAR';
   let selectedUnit: RenderableUnit | null = null;
   let hoveredHex: HexCoord | null = null;
   let currentRound = 1;
@@ -196,7 +214,6 @@ window.addEventListener('DOMContentLoaded', () => {
       if (selectedUnit && turnManager.getPhase() === 'DEPLOYMENT') {
         const stats = ArmyRegistry.getStats(targetClass);
 
-        // Strict Category Swap Check
         const isUnitMelee = selectedUnit.category === 'INFANTRY' || (selectedUnit.category === 'CAVALRY' && selectedUnit.armyClass !== 'HORSE_ARCHER');
         const isCardMelee = stats.category === 'INFANTRY' || (stats.category === 'CAVALRY' && targetClass !== 'HORSE_ARCHER');
 
@@ -767,7 +784,6 @@ window.addEventListener('DOMContentLoaded', () => {
       const effectiveRange = TerrainMatrix.getEffectiveRange(stats.range, selectedUnit.category, attackerTerrain);
       const distToTarget = HexMath.getDistance(selectedUnit.position, clickedHex);
 
-      // STRICT SKILL RANGE ENFORCEMENT CHECK!
       if (distToTarget > effectiveRange) {
         const px = HexMath.hexToPixel(clickedHex, renderer.getHexRadius());
         floatingTexts.push({ x: px.x, y: px.y - 30, text: `🎯 NGOÀI TẦM BẮN SKILL (${effectiveRange} Ô)!`, color: '#EF4444', alpha: 1.0 });
@@ -873,29 +889,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Procedural Map & Battle Reset Function
   function generateNewBattlefield() {
-    mapTiles.length = 0;
-    tileMap.clear();
-
-    for (let q = -6; q <= 6; q++) {
-      for (let r = -6; r <= 6; r++) {
-        if (Math.abs(q + r) <= 6) {
-          let terrain: TerrainType = 'GROUND';
-
-          if (r > -5 && r < 5) {
-            const rand = Math.random();
-            if (rand < 0.15) terrain = 'FOREST';
-            else if (rand < 0.23) terrain = 'HIGH_GROUND';
-            else if (rand < 0.30) terrain = 'RUINS';
-            else if (rand < 0.35) terrain = 'MOUNTAIN';
-            else if (rand < 0.45 && (q === 0 || r === 0 || q + r === 0)) terrain = 'ROAD';
-          }
-
-          const tileData: MapTileRenderData = { coord: { q, r }, terrain };
-          mapTiles.push(tileData);
-          tileMap.set(HexPathfinder.hexKey({ q, r }), { coord: { q, r }, terrain, blockedByUnit: false });
-        }
-      }
-    }
+    generateProceduralMap();
 
     units.length = 0;
     units.push(...createDefaultUnits());
@@ -948,18 +942,16 @@ window.addEventListener('DOMContentLoaded', () => {
 
     if (selectedUnit && !selectedUnit.hasActedThisRound && turnManager.getPhase() === 'PLANNING') {
       if (isTargetingSkillMode) {
-        // Compute Skill Range Highlight Overlay
         const stats = ArmyRegistry.getStats((selectedUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId);
         const effectiveRange = TerrainMatrix.getEffectiveRange(stats.range, selectedUnit.category, getTileTerrain(selectedUnit.position));
 
         skillHighlightMap = new Map();
-        for (let q = -6; q <= 6; q++) {
-          for (let r = -6; r <= 6; r++) {
-            if (Math.abs(q + r) <= 6) {
-              const hex: HexCoord = { q, r };
-              if (HexMath.getDistance(selectedUnit.position, hex) <= effectiveRange) {
-                skillHighlightMap.set(`${q},${r}`, 1);
-              }
+        for (let r = -6; r <= 6; r++) {
+          for (let col = -7; col <= 7; col++) {
+            const q = col - Math.floor(r / 2);
+            const hex: HexCoord = { q, r };
+            if (HexMath.getDistance(selectedUnit.position, hex) <= effectiveRange) {
+              skillHighlightMap.set(`${q},${r}`, 1);
             }
           }
         }

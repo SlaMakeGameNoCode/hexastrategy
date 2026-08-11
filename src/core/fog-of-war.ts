@@ -12,7 +12,7 @@ export interface VisionUnit {
 
 export class FogOfWar {
   /**
-   * Computes all visible hex keys for the player team.
+   * Computes all visible hex keys for the player team across rectangular hex map.
    */
   public static calculateVisibleHexes(units: VisionUnit[], playerColor: string = '#3B82F6'): Set<string> {
     const visibleHexes = new Set<string>();
@@ -21,14 +21,13 @@ export class FogOfWar {
       if (unit.ownerColor === playerColor) {
         const sightRadius = TerrainMatrix.getSightRadius(unit.category, unit.armyClass);
 
-        for (let q = -6; q <= 6; q++) {
-          for (let r = -6; r <= 6; r++) {
-            if (Math.abs(q + r) <= 6) {
-              const hex: HexCoord = { q, r };
-              const dist = HexMath.getDistance(unit.position, hex);
-              if (dist <= sightRadius) {
-                visibleHexes.add(`${q},${r}`);
-              }
+        for (let r = -6; r <= 6; r++) {
+          for (let col = -7; col <= 7; col++) {
+            const q = col - Math.floor(r / 2);
+            const hex: HexCoord = { q, r };
+            const dist = HexMath.getDistance(unit.position, hex);
+            if (dist <= sightRadius) {
+              visibleHexes.add(`${q},${r}`);
             }
           }
         }
@@ -51,12 +50,10 @@ export class FogOfWar {
 
     const hexKey = `${enemyUnit.position.q},${enemyUnit.position.r}`;
 
-    // Must be in player Line of Sight
     if (!visibleHexes.has(hexKey)) {
       return false;
     }
 
-    // Stealthed enemy units in Forest are hidden unless a player unit is directly adjacent (dist <= 1)
     if (enemyUnit.isStealthed) {
       return false;
     }
