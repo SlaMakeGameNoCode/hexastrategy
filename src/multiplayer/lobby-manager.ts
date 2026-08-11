@@ -9,7 +9,7 @@ export interface OnlineUser {
 }
 
 export interface ChallengeMessage {
-  type: 'LOBBY_USERS' | 'CHALLENGE_REQUEST' | 'CHALLENGE_RESPONSE' | 'MATCH_START' | 'SURRENDER_MATCH';
+  type: 'LOBBY_USERS' | 'CHALLENGE_REQUEST' | 'CHALLENGE_RESPONSE' | 'MATCH_START' | 'SURRENDER_MATCH' | 'GAME_ACTION';
   fromUid?: string;
   fromName?: string;
   toUid?: string;
@@ -17,6 +17,10 @@ export interface ChallengeMessage {
   accepted?: boolean;
   users?: OnlineUser[];
   firstTurnColor?: string;
+  mapSeed?: number;
+  // For GAME_ACTION
+  kind?: string;
+  actions?: Array<{ unitId: string; action: object }>;
 }
 
 export class LobbyManager {
@@ -25,8 +29,9 @@ export class LobbyManager {
   private onlineUsers: OnlineUser[] = [];
   private currentRoomId: string | null = null;
 
-  private onMatchStartCallback?: (roomId: string, assignedColor: string, firstTurnColor: string) => void;
+  private onMatchStartCallback?: (roomId: string, assignedColor: string, firstTurnColor: string, mapSeed: number) => void;
   private onSurrenderCallback?: (surrenderUid: string) => void;
+  private onGameActionCallback?: (action: ChallengeMessage) => void;
 
   constructor() {}
 
@@ -98,9 +103,17 @@ export class LobbyManager {
       case 'MATCH_START':
         if (msg.roomId && this.onMatchStartCallback) {
           this.currentRoomId = msg.roomId;
+          // player1 (fromUid) = Blue, player2 (accepter) = Red
           const assignedColor = msg.fromUid === this.currentUser?.uid ? '#3B82F6' : '#EF4444';
           const firstColor = msg.firstTurnColor || '#3B82F6';
-          this.onMatchStartCallback(msg.roomId, assignedColor, firstColor);
+          const seed = msg.mapSeed || Math.floor(Math.random() * 9000000);
+          this.onMatchStartCallback(msg.roomId, assignedColor, firstColor, seed);
+        }
+        break;
+
+      case 'GAME_ACTION':
+        if (this.onGameActionCallback) {
+          this.onGameActionCallback(msg);
         }
         break;
 
@@ -142,12 +155,30 @@ export class LobbyManager {
     }));
   }
 
-  public onMatchStart(cb: (roomId: string, assignedColor: string, firstTurnColor: string) => void): void {
+  /**
+   * Send game action (planned moves) to server for relay to opponent.
+   */
+  public sendGameAction(kind: string, actions: Array<{ unitId: string; action: object }>): void {
+    if (!this.ws || !this.currentUser || !this.currentRoomId) return;
+    this.ws.send(JSON.stringify({
+      type: 'GAME_ACTION',
+      roomId: this.currentRoomId,
+      fromUid: this.currentUser.uid,
+      kind,
+      actions
+    }));
+  }
+
+  public onMatchStart(cb: (roomId: string, assignedColor: string, firstTurnColor: string, mapSeed: number) => void): void {
     this.onMatchStartCallback = cb;
   }
 
   public onSurrender(cb: (surrenderUid: string) => void): void {
     this.onSurrenderCallback = cb;
+  }
+
+  public onGameAction(cb: (action: ChallengeMessage) => void): void {
+    this.onGameActionCallback = cb;
   }
 
   private renderLobbyUI(): void {

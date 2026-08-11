@@ -40,6 +40,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
   let isAuthRegisterTab = false;
 
+  // --- PVP MODE STATE ---
+  let pvpMode = false;
+  let myPvpColor = '#3B82F6';
+  let opponentPvpColor = '#EF4444';
+  let pvpMyActionsSubmitted = false;
+  let pvpOpponentActionsBuffer: Array<{ unitId: string; action: object }> | null = null;
+
   AuthService.onProfileChanged((profile: UserProfile | null) => {
     if (profile) {
       const winRate = profile.totalMatches > 0 ? Math.round((profile.wins / profile.totalMatches) * 100) : 0;
@@ -125,9 +132,21 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   // REALTIME PVP MATCHMAKING LISTENER
-  lobbyManager.onMatchStart((roomId, assignedColor, firstTurnColor) => {
+  lobbyManager.onMatchStart((roomId, assignedColor, firstTurnColor, mapSeed) => {
     if (lobbyModal) lobbyModal.style.display = 'none';
+
+    // Set PvP state BEFORE generating map
+    pvpMode = true;
+    myPvpColor = assignedColor;
+    opponentPvpColor = assignedColor === '#3B82F6' ? '#EF4444' : '#3B82F6';
+    pvpMyActionsSubmitted = false;
+    pvpOpponentActionsBuffer = null;
+
+    // Generate map with shared seed so both clients get identical map
+    _mapSeed = mapSeed;
     generateProceduralMap();
+    _mapSeed = null;
+
     units.length = 0;
     units.push(...createDefaultUnits());
     renderer.cacheTerrain(mapTiles);
@@ -137,9 +156,20 @@ window.addEventListener('DOMContentLoaded', () => {
     currentRound = 1;
 
     const phaseTitle = document.getElementById('phase-title');
-    if (phaseTitle) phaseTitle.innerText = `⚔️ TRẬN ĐẤU PVP ONLINE (${assignedColor === '#3B82F6' ? 'Quân Xanh' : 'Quân Đỏ'})`;
+    if (phaseTitle) phaseTitle.innerText = `⚔️ PVP ONLINE - ${assignedColor === '#3B82F6' ? '🔵 BẠN: QUÂN XANH' : '🔴 BẠN: QUÂN ĐỎ'}`;
 
-    floatingTexts.push({ x: 0, y: -40, text: '⚔️ TRẬN ĐẤU PVP SẴN SÀNG! HÃY XẾP QUÂN', color: '#10B981', alpha: 1.0 });
+    const surrenderBtn = document.getElementById('btn-surrender');
+    if (surrenderBtn) surrenderBtn.style.display = 'flex';
+
+    floatingTexts.push({ x: 0, y: -40, text: `⚔️ PVP! BẠN CHỈ HUY ${assignedColor === '#3B82F6' ? 'QUÂN XANH 🔵' : 'QUÂN ĐỎ 🔴'}`, color: '#10B981', alpha: 1.0 });
+  });
+
+  // Receive opponent's planned actions → apply them then resolve together
+  lobbyManager.onGameAction((msg) => {
+    if (msg.kind === 'TEAM_ACTIONS' && msg.actions) {
+      pvpOpponentActionsBuffer = msg.actions as Array<{ unitId: string; action: object }>;
+      pvpTryResolve();
+    }
   });
 
   lobbyManager.onSurrender((surrenderUid) => {
@@ -192,6 +222,15 @@ window.addEventListener('DOMContentLoaded', () => {
    * - Internal Mountains: Mountain ranges & peaks generated INSIDE the map (Capped <= 22% area)
    * - Solvability Guarantee: A* Path verified from Player to Enemy, opening mountain passes if blocked.
    */
+  // Seeded RNG for shared deterministic map between PvP players
+  let _mapSeed: number | null = null;
+  function rng(): number {
+    if (_mapSeed === null) return Math.random();
+    // LCG seeded random
+    _mapSeed = (_mapSeed * 1664525 + 1013904223) & 0x7fffffff;
+    return _mapSeed / 0x7fffffff;
+  }
+
   function generateProceduralMap() {
     mapTiles.length = 0;
     tileMap.clear();
@@ -215,14 +254,14 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // 2. Randomized Biome Archetype Selection (0: Forest Heavy, 1: Mountain Pass, 2: Highland, 3: Ruins Citadel)
-    const biomeType = Math.floor(Math.random() * 4);
+    const biomeType = Math.floor(rng() * 4);
 
     // 3. Generate Forest Clusters (Min 3 adjacent tiles per cluster)
-    const numForestSeeds = biomeType === 0 ? 6 : Math.floor(Math.random() * 3) + 4;
+    const numForestSeeds = biomeType === 0 ? 6 : Math.floor(rng() * 3) + 4;
     for (let s = 0; s < numForestSeeds; s++) {
       if (forestCount >= maxForest) break;
-      const randCol = Math.floor(Math.random() * 10) - 5;
-      const randR = Math.floor(Math.random() * 8) - 4;
+      const randCol = Math.floor(rng() * 10) - 5;
+      const randR = Math.floor(rng() * 8) - 4;
       const randQ = randCol - Math.floor(randR / 2);
       const seedHex: HexCoord = { q: randQ, r: randR };
 
@@ -239,10 +278,10 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // 4. Generate High Ground Plateaus
-    const numHighSeeds = biomeType === 2 ? 5 : Math.floor(Math.random() * 3) + 2;
+    const numHighSeeds = biomeType === 2 ? 5 : Math.floor(rng() * 3) + 2;
     for (let s = 0; s < numHighSeeds; s++) {
-      const randCol = Math.floor(Math.random() * 8) - 4;
-      const randR = Math.floor(Math.random() * 6) - 3;
+      const randCol = Math.floor(rng() * 8) - 4;
+      const randR = Math.floor(rng() * 6) - 3;
       const randQ = randCol - Math.floor(randR / 2);
       const seedHex: HexCoord = { q: randQ, r: randR };
       const cluster = [seedHex, ...HexMath.getNeighbors(seedHex).slice(0, 3)];
@@ -257,10 +296,10 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // 5. Generate Ancient Ruins
-    const numRuinsSeeds = biomeType === 3 ? 5 : Math.floor(Math.random() * 3) + 2;
+    const numRuinsSeeds = biomeType === 3 ? 5 : Math.floor(rng() * 3) + 2;
     for (let s = 0; s < numRuinsSeeds; s++) {
-      const randCol = Math.floor(Math.random() * 8) - 4;
-      const randR = Math.floor(Math.random() * 6) - 3;
+      const randCol = Math.floor(rng() * 8) - 4;
+      const randR = Math.floor(rng() * 6) - 3;
       const randQ = randCol - Math.floor(randR / 2);
       const seedHex: HexCoord = { q: randQ, r: randR };
 
@@ -272,10 +311,10 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // 6. Generate Water Streams
-    const numWaterSeeds = Math.floor(Math.random() * 2) + 1;
+    const numWaterSeeds = Math.floor(rng() * 2) + 1;
     for (let s = 0; s < numWaterSeeds; s++) {
-      const randCol = Math.floor(Math.random() * 8) - 4;
-      const randR = Math.floor(Math.random() * 6) - 3;
+      const randCol = Math.floor(rng() * 8) - 4;
+      const randR = Math.floor(rng() * 6) - 3;
       const randQ = randCol - Math.floor(randR / 2);
       const seedHex: HexCoord = { q: randQ, r: randR };
       const cluster = [seedHex, ...HexMath.getNeighbors(seedHex).slice(0, 2)];
@@ -290,7 +329,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // 7. Generate Winding Road Highway
-    const roadSinePhase = Math.random() * Math.PI * 2;
+    const roadSinePhase = rng() * Math.PI * 2;
     for (let r = -6; r <= 6; r++) {
       const col = Math.round(Math.sin(r * 0.5 + roadSinePhase) * 3);
       const q = col - Math.floor(r / 2);
@@ -302,11 +341,11 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // 8. Generate INTERNAL & Flank Mountain Ridges INSIDE the Map Grid
-    const numMountainSeeds = biomeType === 1 ? 5 : Math.floor(Math.random() * 3) + 3;
+    const numMountainSeeds = biomeType === 1 ? 5 : Math.floor(rng() * 3) + 3;
     for (let s = 0; s < numMountainSeeds; s++) {
       if (mountainCount >= maxMountain) break;
-      const randCol = Math.floor(Math.random() * 12) - 6;
-      const randR = Math.floor(Math.random() * 8) - 4;
+      const randCol = Math.floor(rng() * 12) - 6;
+      const randR = Math.floor(rng() * 8) - 4;
       const randQ = randCol - Math.floor(randR / 2);
       const seedHex: HexCoord = { q: randQ, r: randR };
 
@@ -643,6 +682,43 @@ window.addEventListener('DOMContentLoaded', () => {
     if (apFill) apFill.style.width = `${(remaining / 10) * 100}%`;
   }
 
+  // PvP: show/hide waiting overlay
+  function showPvpWaiting(show: boolean): void {
+    const overlay = document.getElementById('pvp-waiting-overlay');
+    if (overlay) overlay.style.display = show ? 'flex' : 'none';
+  }
+
+  // PvP: try to resolve when BOTH players have submitted their actions
+  function pvpTryResolve(): void {
+    if (!pvpMyActionsSubmitted) return;
+    if (!pvpOpponentActionsBuffer) {
+      showPvpWaiting(true);
+      return;
+    }
+    // Apply opponent's planned actions to their units
+    for (const { unitId, action } of pvpOpponentActionsBuffer) {
+      const unit = units.find(u => u.id === unitId);
+      if (unit) {
+        unit.assignedAction = action as any;
+        unit.hasActedThisRound = true;
+      }
+    }
+    pvpOpponentActionsBuffer = null;
+    pvpMyActionsSubmitted = false;
+    showPvpWaiting(false);
+    resolveRoundPhase();
+  }
+
+  // PvP: collect own planned actions, send to server, wait for opponent
+  function pvpSubmitTurn(): void {
+    const myActions = units
+      .filter(u => u.ownerColor === myPvpColor && u.assignedAction && u.hasActedThisRound)
+      .map(u => ({ unitId: u.id, action: { ...u.assignedAction } }));
+    lobbyManager.sendGameAction('TEAM_ACTIONS', myActions);
+    pvpMyActionsSubmitted = true;
+    pvpTryResolve();
+  }
+
   function startPlanningTimer() {
     turnManager.startTimer((remSec) => {
       hud.setTimer(remSec);
@@ -654,7 +730,11 @@ window.addEventListener('DOMContentLoaded', () => {
         timerRing.style.background = `conic-gradient(#F59E0B ${pct}%, rgba(255,255,255,0.1) 0%)`;
       }
     }, () => {
-      resolveRoundPhase();
+      if (pvpMode) {
+        pvpSubmitTurn();
+      } else {
+        resolveRoundPhase();
+      }
     });
   }
 
@@ -671,46 +751,48 @@ window.addEventListener('DOMContentLoaded', () => {
     const phaseTitle = document.getElementById('phase-title');
     if (phaseTitle) phaseTitle.innerText = 'Phase Xử Lý Hoạt Cảnh & VFX...';
 
-    // AI Bot assigns actions for Enemy Units
-    for (const u of units) {
-      if (u.ownerColor === '#EF4444' && u.hp > 0 && !u.hasActedThisRound) {
-        let closestTarget: RenderableUnit | null = null;
-        let minDistance = Infinity;
+    // AI Bot assigns actions for Enemy Units (PvP mode: skip AI, opponent controls their units)
+    if (!pvpMode) {
+      for (const u of units) {
+        if (u.ownerColor === '#EF4444' && u.hp > 0 && !u.hasActedThisRound) {
+          let closestTarget: RenderableUnit | null = null;
+          let minDistance = Infinity;
 
-        for (const p of units) {
-          if (p.ownerColor === '#3B82F6' && p.hp > 0) {
-            const d = HexMath.getDistance(u.position, p.position);
-            if (d < minDistance) {
-              minDistance = d;
-              closestTarget = p;
+          for (const p of units) {
+            if (p.ownerColor === '#3B82F6' && p.hp > 0) {
+              const d = HexMath.getDistance(u.position, p.position);
+              if (d < minDistance) {
+                minDistance = d;
+                closestTarget = p;
+              }
             }
           }
-        }
 
-        if (closestTarget) {
-          const stats = ArmyRegistry.getStats((u.armyClass || 'SHORT_SPEAR') as ArmyClassId);
-          const effectiveRange = TerrainMatrix.getEffectiveRange(stats.range, u.category, getTileTerrain(u.position));
+          if (closestTarget) {
+            const stats = ArmyRegistry.getStats((u.armyClass || 'SHORT_SPEAR') as ArmyClassId);
+            const effectiveRange = TerrainMatrix.getEffectiveRange(stats.range, u.category, getTileTerrain(u.position));
 
-          if (minDistance <= effectiveRange) {
-            u.assignedAction = {
-              type: 'ATTACK',
-              targetHex: { ...closestTarget.position },
-              targetUnitId: closestTarget.id,
-              cost: stats.actionCost
-            };
-            u.hasActedThisRound = true;
-          } else {
-            const fullPathRes = HexPathfinder.findPath(u.position, closestTarget.position, 99, u.category, getTileForPathfinding);
-            if (fullPathRes && fullPathRes.path.length > 1) {
-              const maxSteps = Math.min(stats.movementPoints, fullPathRes.path.length - 1);
-              const targetHex = fullPathRes.path[maxSteps];
-              if (targetHex) {
-                u.assignedAction = {
-                  type: 'MOVE',
-                  targetHex: { ...targetHex },
-                  cost: stats.actionCost
-                };
-                u.hasActedThisRound = true;
+            if (minDistance <= effectiveRange) {
+              u.assignedAction = {
+                type: 'ATTACK',
+                targetHex: { ...closestTarget.position },
+                targetUnitId: closestTarget.id,
+                cost: stats.actionCost
+              };
+              u.hasActedThisRound = true;
+            } else {
+              const fullPathRes = HexPathfinder.findPath(u.position, closestTarget.position, 99, u.category, getTileForPathfinding);
+              if (fullPathRes && fullPathRes.path.length > 1) {
+                const maxSteps = Math.min(stats.movementPoints, fullPathRes.path.length - 1);
+                const targetHex = fullPathRes.path[maxSteps];
+                if (targetHex) {
+                  u.assignedAction = {
+                    type: 'MOVE',
+                    targetHex: { ...targetHex },
+                    cost: stats.actionCost
+                  };
+                  u.hasActedThisRound = true;
+                }
               }
             }
           }
@@ -1103,7 +1185,9 @@ window.addEventListener('DOMContentLoaded', () => {
     const clickedHex = getCanvasHex(evt);
 
     if (turnManager.getPhase() === 'DEPLOYMENT') {
-      const clickedPlayerUnit = units.find(u => u.hp > 0 && u.ownerColor === '#3B82F6' && u.position.q === clickedHex.q && u.position.r === clickedHex.r);
+      // In PvP: each player can select their own color units
+      const myColor = pvpMode ? myPvpColor : '#3B82F6';
+      const clickedPlayerUnit = units.find(u => u.hp > 0 && u.ownerColor === myColor && u.position.q === clickedHex.q && u.position.r === clickedHex.r);
       if (clickedPlayerUnit) {
         selectUnit(clickedPlayerUnit);
       }
@@ -1112,14 +1196,17 @@ window.addEventListener('DOMContentLoaded', () => {
 
     if (turnManager.getPhase() !== 'PLANNING') return;
 
-    const visibleHexes = FogOfWar.calculateVisibleHexes(units, '#3B82F6');
+    // In PvP: use player's own color for fog-of-war calculation
+    const myColor = pvpMode ? myPvpColor : '#3B82F6';
+    const enemyColor = pvpMode ? opponentPvpColor : '#EF4444';
+    const visibleHexes = FogOfWar.calculateVisibleHexes(units, myColor);
 
     const clickedUnit = units.find(
       (u) => u.hp > 0 && u.position.q === clickedHex.q && u.position.r === clickedHex.r &&
-        FogOfWar.isEnemyUnitVisible(u, visibleHexes, '#3B82F6')
+        FogOfWar.isEnemyUnitVisible(u, visibleHexes, myColor)
     );
 
-    if (clickedUnit && clickedUnit.ownerColor === '#3B82F6') {
+    if (clickedUnit && clickedUnit.ownerColor === myColor) {
       isTargetingSkillMode = false;
       selectUnit(clickedUnit);
       return;
@@ -1157,7 +1244,7 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (clickedUnit && clickedUnit.ownerColor === '#EF4444' && selectedUnit && !selectedUnit.hasActedThisRound) {
+    if (clickedUnit && clickedUnit.ownerColor === enemyColor && selectedUnit && !selectedUnit.hasActedThisRound) {
       const stats = ArmyRegistry.getStats((selectedUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId);
       const attackerTerrain = getTileTerrain(selectedUnit.position);
       const effectiveRange = TerrainMatrix.getEffectiveRange(stats.range, selectedUnit.category, attackerTerrain);
@@ -1183,7 +1270,7 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (selectedUnit && selectedUnit.ownerColor === '#3B82F6' && !selectedUnit.hasActedThisRound) {
+    if (selectedUnit && selectedUnit.ownerColor === myColor && !selectedUnit.hasActedThisRound) {
       const tile = tileMap.get(HexPathfinder.hexKey(clickedHex));
       if (tile && tile.blockedByUnit) return;
 
@@ -1203,7 +1290,8 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('btn-skill')?.addEventListener('click', () => {
-    if (selectedUnit && selectedUnit.ownerColor === '#3B82F6' && turnManager.getPhase() === 'PLANNING') {
+    const myColor = pvpMode ? myPvpColor : '#3B82F6';
+    if (selectedUnit && selectedUnit.ownerColor === myColor && turnManager.getPhase() === 'PLANNING') {
       if (selectedUnit.hasActedThisRound) {
         delete selectedUnit.assignedAction;
         selectedUnit.hasActedThisRound = false;
@@ -1344,7 +1432,11 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('btn-end-turn')?.addEventListener('click', () => {
-    resolveRoundPhase();
+    if (pvpMode) {
+      pvpSubmitTurn();
+    } else {
+      resolveRoundPhase();
+    }
   });
 
   // 60 FPS Render Loop

@@ -46,7 +46,7 @@ const wss = new WebSocketServer({ server });
 
 // Map: uid -> { ws, user }
 const connectedClients = new Map();
-// Map: roomId -> { player1Uid, player2Uid }
+// Map: roomId -> { player1Uid, player2Uid, mapSeed }
 const activeRooms = new Map();
 
 function broadcastLobbyState() {
@@ -97,13 +97,20 @@ wss.on('connection', (ws) => {
             const challengerClient = connectedClients.get(data.toUid);
             if (data.accepted) {
               const roomId = `room_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-              activeRooms.set(roomId, { player1Uid: data.toUid, player2Uid: data.fromUid });
+              // Generate shared map seed for deterministic map on both clients
+              const mapSeed = Math.floor(Math.random() * 9000000) + 1000000;
+              activeRooms.set(roomId, {
+                player1Uid: data.toUid,
+                player2Uid: data.fromUid,
+                mapSeed
+              });
 
               const matchMsg = JSON.stringify({
                 type: 'MATCH_START',
                 roomId,
-                fromUid: data.toUid,
-                firstTurnColor: '#3B82F6'
+                fromUid: data.toUid,   // player1 = challenger (blue)
+                firstTurnColor: '#3B82F6',
+                mapSeed
               });
 
               if (challengerClient.ws.readyState === WebSocket.OPEN) {
@@ -120,6 +127,18 @@ wss.on('connection', (ws) => {
                   accepted: false
                 }));
               }
+            }
+          }
+          break;
+
+        // GAME_ACTION: relay game moves between 2 players in the same room
+        case 'GAME_ACTION':
+          if (data.roomId && activeRooms.has(data.roomId)) {
+            const room = activeRooms.get(data.roomId);
+            const opponentUid = room.player1Uid === data.fromUid ? room.player2Uid : room.player1Uid;
+            const opponentClient = connectedClients.get(opponentUid);
+            if (opponentClient && opponentClient.ws.readyState === WebSocket.OPEN) {
+              opponentClient.ws.send(JSON.stringify(data));
             }
           }
           break;
