@@ -10,6 +10,8 @@ import { CombatResolver } from './gameplay/combat-resolver.js';
 import { SkillResolver, SkillType } from './gameplay/skill-resolver.js';
 import { ProjectileType } from './ui/vfx-manager.js';
 import { FogOfWar } from './core/fog-of-war.js';
+import { AuthService, UserProfile } from './firebase/auth-service.js';
+import { LobbyManager } from './multiplayer/lobby-manager.js';
 
 window.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -19,12 +21,171 @@ window.addEventListener('DOMContentLoaded', () => {
   const pathOverlay = new PathPreviewOverlay();
   const hud = new HUDOverlay();
   const turnManager = new TurnManager();
+  const lobbyManager = new LobbyManager();
 
   const floatingTexts: FloatingText[] = [];
 
   // Rectangular Hex Map Grid (15 Columns Wide x 13 Rows Tall)
   const mapTiles: MapTileRenderData[] = [];
   const tileMap = new Map<string, MapHexTile>();
+
+  // --- FIREBASE AUTH & USER HEADER STATS BINDING ---
+  AuthService.initAuthListener();
+
+  const userInfoText = document.getElementById('user-info-text');
+  const btnAuthOpen = document.getElementById('btn-auth-open');
+  const btnLobbyOpen = document.getElementById('btn-lobby-open');
+  const authModal = document.getElementById('auth-modal');
+  const lobbyModal = document.getElementById('lobby-modal');
+
+  let isAuthRegisterTab = false;
+
+  AuthService.onProfileChanged((profile: UserProfile | null) => {
+    if (profile) {
+      const winRate = profile.totalMatches > 0 ? Math.round((profile.wins / profile.totalMatches) * 100) : 0;
+      if (userInfoText) {
+        userInfoText.innerHTML = `👤 <b>${profile.displayName}</b> | 🏆 Thắng: <span style="color:#10B981;">${profile.wins}</span> - Thua: <span style="color:#EF4444;">${profile.losses}</span> (${winRate}%)`;
+      }
+      if (btnAuthOpen) btnAuthOpen.innerText = '🚪 Đăng Xuất';
+      lobbyManager.connect(profile);
+    } else {
+      if (userInfoText) userInfoText.innerText = '👤 Khách (PvE Mode)';
+      if (btnAuthOpen) btnAuthOpen.innerText = '🔑 Đăng Nhập / Đăng Ký';
+    }
+  });
+
+  if (btnAuthOpen) {
+    btnAuthOpen.onclick = () => {
+      if (AuthService.getCurrentUser()) {
+        if (confirm('Bạn có chắc muốn đăng xuất tài khoản?')) {
+          AuthService.logout();
+        }
+      } else {
+        if (authModal) authModal.style.display = 'flex';
+      }
+    };
+  }
+
+  if (btnLobbyOpen) {
+    btnLobbyOpen.onclick = () => {
+      if (!AuthService.getCurrentUser()) {
+        alert('🔑 Vui lòng Đăng Nhập hoặc Đăng Ký tài khoản trước khi vào Sảnh PvP!');
+        if (authModal) authModal.style.display = 'flex';
+        return;
+      }
+      if (lobbyModal) lobbyModal.style.display = 'flex';
+    };
+  }
+
+  document.getElementById('btn-auth-close')?.addEventListener('click', () => {
+    if (authModal) authModal.style.display = 'none';
+  });
+
+  document.getElementById('btn-lobby-close')?.addEventListener('click', () => {
+    if (lobbyModal) lobbyModal.style.display = 'none';
+  });
+
+  document.getElementById('tab-login')?.addEventListener('click', () => {
+    isAuthRegisterTab = false;
+    document.getElementById('tab-login')?.classList.add('primary');
+    document.getElementById('tab-register')?.classList.remove('primary');
+    const nameInput = document.getElementById('auth-name');
+    if (nameInput) nameInput.style.display = 'none';
+  });
+
+  document.getElementById('tab-register')?.addEventListener('click', () => {
+    isAuthRegisterTab = true;
+    document.getElementById('tab-register')?.classList.add('primary');
+    document.getElementById('tab-login')?.classList.remove('primary');
+    const nameInput = document.getElementById('auth-name');
+    if (nameInput) nameInput.style.display = 'block';
+  });
+
+  document.getElementById('btn-auth-submit')?.addEventListener('click', async () => {
+    const email = (document.getElementById('auth-email') as HTMLInputElement).value;
+    const pass = (document.getElementById('auth-pass') as HTMLInputElement).value;
+    const name = (document.getElementById('auth-name') as HTMLInputElement).value;
+
+    if (!email || !pass) {
+      alert('Vui lòng nhập đầy đủ Email và Mật khẩu!');
+      return;
+    }
+
+    try {
+      if (isAuthRegisterTab) {
+        await AuthService.register(email, pass, name);
+        alert('🎉 Đăng ký tài khoản thành công!');
+      } else {
+        await AuthService.login(email, pass);
+        alert('✅ Đăng nhập thành công!');
+      }
+      if (authModal) authModal.style.display = 'none';
+    } catch (e: any) {
+      alert('❌ Lỗi xác thực: ' + (e.message || 'Vui lòng kiểm tra lại thông tin'));
+    }
+  });
+
+  // REALTIME PVP MATCHMAKING LISTENER
+  lobbyManager.onMatchStart((roomId, assignedColor, firstTurnColor) => {
+    if (lobbyModal) lobbyModal.style.display = 'none';
+    generateProceduralMap();
+    units.length = 0;
+    units.push(...createDefaultUnits());
+    renderer.cacheTerrain(mapTiles);
+    updateTileOccupancy();
+
+    turnManager.setPhase('DEPLOYMENT');
+    currentRound = 1;
+
+    const phaseTitle = document.getElementById('phase-title');
+    if (phaseTitle) phaseTitle.innerText = `⚔️ TRẬN ĐẤU PVP ONLINE (${assignedColor === '#3B82F6' ? 'Quân Xanh' : 'Quân Đỏ'})`;
+
+    floatingTexts.push({ x: 0, y: -40, text: '⚔️ TRẬN ĐẤU PVP SẴN SÀNG! HÃY XẾP QUÂN', color: '#10B981', alpha: 1.0 });
+  });
+
+  lobbyManager.onSurrender((surrenderUid) => {
+    const user = AuthService.getCurrentUser();
+    const isMeSurrender = user?.uid === surrenderUid;
+
+    turnManager.stopTimer();
+    const resultModal = document.getElementById('result-modal');
+    const resultTitle = document.getElementById('result-title');
+    const resultDesc = document.getElementById('result-desc');
+
+    if (resultModal && resultTitle && resultDesc) {
+      if (isMeSurrender) {
+        resultTitle.innerText = 'DEFEAT!';
+        resultTitle.style.color = '#EF4444';
+        resultDesc.innerText = 'Bạn đã chọn Đầu Hàng trận đấu!';
+        AuthService.recordMatchResult(false);
+      } else {
+        resultTitle.innerText = 'VICTORY!';
+        resultTitle.style.color = '#10B981';
+        resultDesc.innerText = 'Đối thủ đã tuyên bố Đầu Hàng!';
+        AuthService.recordMatchResult(true);
+      }
+      resultModal.style.display = 'flex';
+    }
+  });
+
+  // SURRENDER BUTTON HANDLER
+  document.getElementById('btn-surrender')?.addEventListener('click', () => {
+    if (confirm('🏳️ Bạn có chắc chắn muốn ĐẦU HÀNG trận đấu này không? (Sẽ bị tính 1 trận thua)')) {
+      lobbyManager.surrenderMatch();
+      AuthService.recordMatchResult(false);
+
+      const resultModal = document.getElementById('result-modal');
+      const resultTitle = document.getElementById('result-title');
+      const resultDesc = document.getElementById('result-desc');
+
+      if (resultModal && resultTitle && resultDesc) {
+        resultTitle.innerText = 'DEFEAT!';
+        resultTitle.style.color = '#EF4444';
+        resultDesc.innerText = 'Bạn đã chấp nhận Đầu Hàng!';
+        resultModal.style.display = 'flex';
+      }
+    }
+  });
 
   /**
    * Procedurally generates a randomized terrain map following strict Game Design Rules:
@@ -145,12 +306,11 @@ window.addEventListener('DOMContentLoaded', () => {
     const numMountainSeeds = biomeType === 1 ? 5 : Math.floor(Math.random() * 3) + 3;
     for (let s = 0; s < numMountainSeeds; s++) {
       if (mountainCount >= maxMountain) break;
-      const randCol = Math.floor(Math.random() * 12) - 6; // col from -6 to 5 inside map!
-      const randR = Math.floor(Math.random() * 8) - 4;    // r from -4 to 3 inside map!
+      const randCol = Math.floor(Math.random() * 12) - 6;
+      const randR = Math.floor(Math.random() * 8) - 4;
       const randQ = randCol - Math.floor(randR / 2);
       const seedHex: HexCoord = { q: randQ, r: randR };
 
-      // Mountain ridge cluster (2 to 4 adjacent mountain tiles)
       const mCluster = [seedHex, ...HexMath.getNeighbors(seedHex).slice(0, 3)];
       for (const hex of mCluster) {
         if (mountainCount >= maxMountain) break;
@@ -170,7 +330,6 @@ window.addEventListener('DOMContentLoaded', () => {
     let testPath = HexPathfinder.findPath(playerStart, enemyStart, 999, 'INFANTRY', (coord) => tileMap.get(HexPathfinder.hexKey(coord)));
 
     if (!testPath) {
-      // Break internal mountain obstacles along central corridor to open a Mountain Pass path!
       for (let r = 5; r >= -5; r--) {
         const col = 0;
         const q = col - Math.floor(r / 2);
@@ -181,7 +340,6 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Sync mapTiles array with tileMap state
     for (let i = 0; i < mapTiles.length; i++) {
       const key = HexPathfinder.hexKey(mapTiles[i].coord);
       const tile = tileMap.get(key);
@@ -191,7 +349,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
   generateProceduralMap();
 
-  // Create 8 Pre-deployed units for Player & Enemy
   function createDefaultUnits(): RenderableUnit[] {
     const playerRoster: { classId: ArmyClassId; pos: HexCoord }[] = [
       { classId: 'SHORT_SPEAR', pos: { q: -4 - Math.floor(5 / 2), r: 5 } },
@@ -236,7 +393,7 @@ window.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    // Enemy Units (Randomized 4 Melee, 4 Ranged)
+    // Enemy Units
     enemyRosterPositions.forEach((pos, idx) => {
       const isMelee = idx < 4;
       const pool = isMelee ? enemyMeleePool : enemyRangedPool;
@@ -599,7 +756,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     const executeTeamTurn = async (teamUnits: RenderableUnit[]) => {
-      // 1. Movement Phase (Supports automatic move-and-attack for melee/ranged out of range)
       for (const u of teamUnits) {
         if (u.hp <= 0) continue;
         const action = u.assignedAction;
@@ -663,7 +819,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
       await new Promise((r) => setTimeout(r, 200));
 
-      // 2. Combat & Skill Execution Phase
       for (const u of teamUnits) {
         if (u.hp <= 0) continue;
         const action = u.assignedAction;
@@ -896,10 +1051,12 @@ window.addEventListener('DOMContentLoaded', () => {
           resultTitle.innerText = 'VICTORY!';
           resultTitle.style.color = '#10B981';
           resultDesc.innerText = 'Bạn đã tiêu diệt toàn bộ lực lượng địch!';
+          AuthService.recordMatchResult(true);
         } else if (!playerAlive && enemyAlive) {
           resultTitle.innerText = 'DEFEAT!';
           resultTitle.style.color = '#EF4444';
           resultDesc.innerText = 'Lực lượng của bạn đã bị tiêu diệt hoàn toàn!';
+          AuthService.recordMatchResult(false);
         } else {
           resultTitle.innerText = 'DRAW!';
           resultTitle.style.color = '#F59E0B';
@@ -920,7 +1077,7 @@ window.addEventListener('DOMContentLoaded', () => {
     turnManager.setPhase('PLANNING');
 
     if (phaseTitle) phaseTitle.innerText = `Round ${currentRound} - Lập Kế Hoạch`;
-    if (globalTurnContainer) globalTurnContainer.style.display = 'block';
+    if (globalTurnContainer) globalTurnContainer.style.display = 'flex';
 
     updateAPBudget();
     startPlanningTimer();
@@ -937,14 +1094,12 @@ window.addEventListener('DOMContentLoaded', () => {
     hoveredHex = getCanvasHex(evt);
   });
 
-  // RIGHT-CLICK CANCELS SELECTION & SKILL TARGETING MODE IMMEDIATELY
   canvas.addEventListener('contextmenu', (evt) => {
     evt.preventDefault();
     isTargetingSkillMode = false;
     selectUnit(null);
   });
 
-  // LEFT-CLICK EVENT HANDLER
   canvas.addEventListener('click', (evt) => {
     const clickedHex = getCanvasHex(evt);
 
@@ -1081,7 +1236,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Random Map Generator Button Listener
   document.getElementById('btn-random-map')?.addEventListener('click', () => {
     if (turnManager.getPhase() === 'DEPLOYMENT') {
       generateProceduralMap();
@@ -1090,7 +1244,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Start Battle Button Listener -> Triggers Matchup Showcase Modal (3s Countdown + AP Priority)
   document.getElementById('btn-start-battle')?.addEventListener('click', () => {
     const matchupModal = document.getElementById('matchup-modal');
     const playerApEl = document.getElementById('matchup-player-ap');
@@ -1122,7 +1275,6 @@ window.addEventListener('DOMContentLoaded', () => {
     if (playerApEl) playerApEl.innerText = `Tổng AP: ${playerTotalAP}`;
     if (enemyApEl) enemyApEl.innerText = `Tổng AP: ${enemyTotalAP}`;
 
-    // Populate Squad Lists
     if (playerListEl) {
       playerListEl.innerHTML = units
         .filter(u => u.ownerColor === '#3B82F6')
@@ -1143,7 +1295,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
     if (matchupModal) matchupModal.style.display = 'flex';
 
-    // 3-Second Countdown
     let countdown = 3;
     if (countdownEl) countdownEl.innerText = '3';
 
@@ -1161,7 +1312,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const phaseTitle = document.getElementById('phase-title');
 
         if (deckDrawer) deckDrawer.style.display = 'none';
-        if (globalTurnContainer) globalTurnContainer.style.display = 'block';
+        if (globalTurnContainer) globalTurnContainer.style.display = 'flex';
         if (phaseTitle) phaseTitle.innerText = `Round 1 - Lập Kế Hoạch (${firstTurnOwnerColor === '#3B82F6' ? 'Bạn đi trước' : 'Địch đi trước'})`;
 
         selectUnit(null);

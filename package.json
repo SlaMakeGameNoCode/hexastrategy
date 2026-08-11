@@ -7,10 +7,12 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "server": "tsx src/server/server.ts",
+    "start": "node server.js",
+    "server": "node server.js",
     "test": "vitest run"
   },
   "dependencies": {
+    "firebase": "^12.17.1",
     "ws": "^8.18.0"
   },
   "devDependencies": {
