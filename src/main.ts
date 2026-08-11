@@ -30,65 +30,154 @@ window.addEventListener('DOMContentLoaded', () => {
     mapTiles.length = 0;
     tileMap.clear();
 
+    const totalHexes = 15 * 13;
+    const maxForest = Math.floor(totalHexes * 0.35);
+    const maxMountain = Math.floor(totalHexes * 0.20);
+
+    let forestCount = 0;
+    let mountainCount = 0;
+
+    // 1. Initialize Ground Grid
     for (let r = -6; r <= 6; r++) {
       for (let col = -7; col <= 7; col++) {
         const q = col - Math.floor(r / 2);
-        let terrain: TerrainType = 'GROUND';
-
-        // Procedural terrain distribution
-        if ((r === 0 || r === 1) && Math.abs(col) <= 6) {
-          terrain = 'ROAD';
-        } else if ((r === -2 || r === 2) && Math.abs(col) === 0) {
-          terrain = 'HIGH_GROUND';
-        } else if ((r === -4 && Math.abs(col) <= 2) || (r === 4 && Math.abs(col) <= 2)) {
-          terrain = 'HIGH_GROUND';
-        } else if ((r === -3 && (col === -4 || col === 4)) || (r === 3 && (col === -4 || col === 4))) {
-          terrain = 'FOREST';
-        } else if ((r === -1 && (col === -5 || col === 5)) || (r === 1 && (col === -5 || col === 5))) {
-          terrain = 'FOREST';
-        } else if ((r === -2 && (col === -3 || col === 3)) || (r === 2 && (col === -3 || col === 3))) {
-          terrain = 'RUINS';
-        } else if (Math.abs(col) === 7) {
-          terrain = 'MOUNTAIN';
-        } else if (Math.abs(col) === 6 && (r === -5 || r === 5 || r === 0)) {
-          terrain = 'WATER';
-        }
-
         const coord: HexCoord = { q, r };
-        mapTiles.push({ coord, terrain });
-        tileMap.set(HexPathfinder.hexKey(coord), { coord, terrain, blockedByUnit: false });
+        const tileData: MapTileRenderData = { coord, terrain: 'GROUND' };
+        mapTiles.push(tileData);
+        tileMap.set(HexPathfinder.hexKey(coord), { coord, terrain: 'GROUND', blockedByUnit: false });
       }
+    }
+
+    // 2. Generate Road Highway connecting South to North
+    for (let r = -6; r <= 6; r++) {
+      const col = Math.round(Math.sin(r * 0.5) * 2);
+      const q = col - Math.floor(r / 2);
+      const key = `${q},${r}`;
+      const tile = tileMap.get(key);
+      if (tile) tile.terrain = 'ROAD';
+    }
+
+    // 3. Generate Forest Clusters (Min 3 adjacent hexes per cluster, total <= 35%)
+    const forestSeeds = [
+      { col: -4, r: -3 }, { col: 4, r: 3 }, { col: -3, r: 2 }, { col: 3, r: -2 }
+    ];
+
+    for (const seed of forestSeeds) {
+      const qSeed = seed.col - Math.floor(seed.r / 2);
+      const seedHex: HexCoord = { q: qSeed, r: seed.r };
+      const clusterHexes = [seedHex, ...HexMath.getNeighbors(seedHex)];
+
+      for (const hex of clusterHexes) {
+        if (forestCount >= maxForest) break;
+        const key = HexPathfinder.hexKey(hex);
+        const tile = tileMap.get(key);
+        if (tile && tile.terrain === 'GROUND') {
+          tile.terrain = 'FOREST';
+          forestCount++;
+        }
+      }
+    }
+
+    // 4. Generate Mountain Barriers (Capped <= 20%)
+    for (let r = -6; r <= 6; r++) {
+      if (mountainCount >= maxMountain) break;
+
+      // Left & Right mountain borders
+      const leftQ = -7 - Math.floor(r / 2);
+      const rightQ = 7 - Math.floor(r / 2);
+
+      const leftTile = tileMap.get(`${leftQ},${r}`);
+      if (leftTile) { leftTile.terrain = 'MOUNTAIN'; mountainCount++; }
+
+      const rightTile = tileMap.get(`${rightQ},${r}`);
+      if (rightTile) { rightTile.terrain = 'MOUNTAIN'; mountainCount++; }
+
+      if (r === -2 || r === 2) {
+        const midQ = -3 - Math.floor(r / 2);
+        const midTile = tileMap.get(`${midQ},${r}`);
+        if (midTile && midTile.terrain === 'GROUND') {
+          midTile.terrain = 'MOUNTAIN';
+          mountainCount++;
+        }
+      }
+    }
+
+    // 5. Generate High Ground Plateaus & Ruins
+    for (let col = -3; col <= 3; col++) {
+      const q1 = col - Math.floor(-4 / 2);
+      const tile1 = tileMap.get(`${q1},-4`);
+      if (tile1 && tile1.terrain === 'GROUND') tile1.terrain = 'HIGH_GROUND';
+
+      const q2 = col - Math.floor(4 / 2);
+      const tile2 = tileMap.get(`${q2},4`);
+      if (tile2 && tile2.terrain === 'GROUND') tile2.terrain = 'HIGH_GROUND';
+    }
+
+    const ruinsSeeds = [{ col: -2, r: -1 }, { col: 2, r: 1 }, { col: 0, r: 0 }];
+    for (const rSeed of ruinsSeeds) {
+      const q = rSeed.col - Math.floor(rSeed.r / 2);
+      const tile = tileMap.get(`${q},${rSeed.r}`);
+      if (tile && tile.terrain === 'GROUND') tile.terrain = 'RUINS';
+    }
+
+    // 6. Solvability Verification (A* Path from Player start to Enemy start)
+    const playerStart: HexCoord = { q: -1 - Math.floor(5 / 2), r: 5 };
+    const enemyStart: HexCoord = { q: -1 - Math.floor(-5 / 2), r: -5 };
+
+    const testPath = HexPathfinder.findPath(playerStart, enemyStart, 999, 'INFANTRY', (coord) => tileMap.get(HexPathfinder.hexKey(coord)));
+
+    if (!testPath) {
+      // Break a mountain pass path to guarantee solvability!
+      for (let r = 5; r >= -5; r--) {
+        const col = 0;
+        const q = col - Math.floor(r / 2);
+        const tile = tileMap.get(`${q},${r}`);
+        if (tile && tile.terrain === 'MOUNTAIN') {
+          tile.terrain = 'ROAD';
+        }
+      }
+    }
+
+    // Update mapTiles render array
+    for (let i = 0; i < mapTiles.length; i++) {
+      const key = HexPathfinder.hexKey(mapTiles[i].coord);
+      const tile = tileMap.get(key);
+      if (tile) mapTiles[i].terrain = tile.terrain;
     }
   }
 
   generateProceduralMap();
 
-  // Pre-deployed 8 Units Roster (4 Melee, 4 Ranged) for Player & Enemy inside Rectangular Map
+  // Create 8 Pre-deployed units for Player & Enemy
   function createDefaultUnits(): RenderableUnit[] {
     const playerRoster: { classId: ArmyClassId; pos: HexCoord }[] = [
-      { classId: 'SHORT_SPEAR', pos: { q: -4 - Math.floor(5 / 2), r: 5 } }, // col = -4 -> q = -6
-      { classId: 'SWORD_SHIELD', pos: { q: -1 - Math.floor(5 / 2), r: 5 } }, // col = -1 -> q = -3
-      { classId: 'LONG_SPEAR', pos: { q: 1 - Math.floor(5 / 2), r: 5 } },   // col = 1 -> q = -1
-      { classId: 'SHORT_SPEAR', pos: { q: 4 - Math.floor(5 / 2), r: 5 } },  // col = 4 -> q = 2
-      { classId: 'CROSSBOW', pos: { q: -5 - Math.floor(6 / 2), r: 6 } },    // col = -5 -> q = -8
-      { classId: 'SHORT_BOW', pos: { q: -2 - Math.floor(6 / 2), r: 6 } },   // col = -2 -> q = -5
-      { classId: 'SHORT_BOW', pos: { q: 2 - Math.floor(6 / 2), r: 6 } },    // col = 2 -> q = -1
-      { classId: 'CROSSBOW', pos: { q: 5 - Math.floor(6 / 2), r: 6 } }      // col = 5 -> q = 2
+      { classId: 'SHORT_SPEAR', pos: { q: -4 - Math.floor(5 / 2), r: 5 } },
+      { classId: 'SWORD_SHIELD', pos: { q: -1 - Math.floor(5 / 2), r: 5 } },
+      { classId: 'LONG_SPEAR', pos: { q: 1 - Math.floor(5 / 2), r: 5 } },
+      { classId: 'SHORT_SPEAR', pos: { q: 4 - Math.floor(5 / 2), r: 5 } },
+      { classId: 'CROSSBOW', pos: { q: -5 - Math.floor(6 / 2), r: 6 } },
+      { classId: 'SHORT_BOW', pos: { q: -2 - Math.floor(6 / 2), r: 6 } },
+      { classId: 'SHORT_BOW', pos: { q: 2 - Math.floor(6 / 2), r: 6 } },
+      { classId: 'CROSSBOW', pos: { q: 5 - Math.floor(6 / 2), r: 6 } }
     ];
 
-    const enemyRoster: { classId: ArmyClassId; pos: HexCoord }[] = [
-      { classId: 'SHORT_SPEAR', pos: { q: -4 - Math.floor(-5 / 2), r: -5 } }, // col = -4 -> q = -1
-      { classId: 'SWORD_SHIELD', pos: { q: -1 - Math.floor(-5 / 2), r: -5 } }, // col = -1 -> q = 2
-      { classId: 'LONG_SPEAR', pos: { q: 1 - Math.floor(-5 / 2), r: -5 } },   // col = 1 -> q = 4
-      { classId: 'SHORT_SPEAR', pos: { q: 4 - Math.floor(-5 / 2), r: -5 } },  // col = 4 -> q = 7
-      { classId: 'CROSSBOW', pos: { q: -5 - Math.floor(-6 / 2), r: -6 } },    // col = -5 -> q = -2
-      { classId: 'SHORT_BOW', pos: { q: -2 - Math.floor(-6 / 2), r: -6 } },   // col = -2 -> q = 1
-      { classId: 'SHORT_BOW', pos: { q: 2 - Math.floor(-6 / 2), r: -6 } },    // col = 2 -> q = 5
-      { classId: 'CROSSBOW', pos: { q: 5 - Math.floor(-6 / 2), r: -6 } }      // col = 5 -> q = 8
+    const enemyMeleePool: ArmyClassId[] = ['SHORT_SPEAR', 'LONG_SPEAR', 'SWORD_SHIELD', 'GREATSWORD', 'LIGHT_CAVALRY', 'HEAVY_CAVALRY'];
+    const enemyRangedPool: ArmyClassId[] = ['SHORT_BOW', 'LONGBOW', 'CROSSBOW', 'HEAVY_CROSSBOW', 'HORSE_ARCHER', 'CATAPULT'];
+
+    const enemyRosterPositions: HexCoord[] = [
+      { q: -4 - Math.floor(-5 / 2), r: -5 },
+      { q: -1 - Math.floor(-5 / 2), r: -5 },
+      { q: 1 - Math.floor(-5 / 2), r: -5 },
+      { q: 4 - Math.floor(-5 / 2), r: -5 },
+      { q: -5 - Math.floor(-6 / 2), r: -6 },
+      { q: -2 - Math.floor(-6 / 2), r: -6 },
+      { q: 2 - Math.floor(-6 / 2), r: -6 },
+      { q: 5 - Math.floor(-6 / 2), r: -6 }
     ];
 
     const result: RenderableUnit[] = [];
 
+    // Player Units
     playerRoster.forEach((item, idx) => {
       const stats = ArmyRegistry.getStats(item.classId);
       result.push({
@@ -104,14 +193,19 @@ window.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    enemyRoster.forEach((item, idx) => {
-      const stats = ArmyRegistry.getStats(item.classId);
+    // Enemy Units (Randomized 4 Melee, 4 Ranged)
+    enemyRosterPositions.forEach((pos, idx) => {
+      const isMelee = idx < 4;
+      const pool = isMelee ? enemyMeleePool : enemyRangedPool;
+      const randClass = pool[Math.floor(Math.random() * pool.length)];
+      const stats = ArmyRegistry.getStats(randClass);
+
       result.push({
         id: `u_enemy_${idx}_${Date.now()}`,
         name: stats.name,
         armyClass: stats.id,
         category: stats.category,
-        position: { ...item.pos },
+        position: { ...pos },
         hp: stats.hp,
         maxHp: stats.hp,
         ownerColor: '#EF4444',
@@ -127,6 +221,7 @@ window.addEventListener('DOMContentLoaded', () => {
   let hoveredHex: HexCoord | null = null;
   let currentRound = 1;
   let isTargetingSkillMode = false;
+  let firstTurnOwnerColor: string = '#3B82F6';
 
   function isUnitBracingOrSpearWall(unit: RenderableUnit): boolean {
     if (!unit.assignedAction) return false;
@@ -138,6 +233,17 @@ window.addEventListener('DOMContentLoaded', () => {
   function getTileTerrain(coord: HexCoord): TerrainType {
     const tile = tileMap.get(HexPathfinder.hexKey(coord));
     return tile ? tile.terrain : 'GROUND';
+  }
+
+  function calculateSquadTotalAP(ownerColor: string): number {
+    let totalAP = 0;
+    for (const u of units) {
+      if (u.ownerColor === ownerColor && u.hp > 0 && u.armyClass) {
+        const stats = ArmyRegistry.getStats(u.armyClass as ArmyClassId);
+        totalAP += stats.actionCost;
+      }
+    }
+    return totalAP;
   }
 
   function updateInspectorPanel(armyClass: ArmyClassId, unitPosition?: HexCoord) {
@@ -174,7 +280,6 @@ window.addEventListener('DOMContentLoaded', () => {
     if (counterDescEl) counterDescEl.innerText = `Chi phí: ${stats.actionCost} AP / lượt. Tốc độ di chuyển: ${stats.movementPoints} MP.`;
   }
 
-  // Filter Deck Buttons based on Selected Unit's Category (MELEE vs RANGED)
   function filterDeckButtonsForUnit(unit: RenderableUnit | null) {
     const deckButtons = document.querySelectorAll('.deck-card-btn');
     if (!unit || turnManager.getPhase() !== 'DEPLOYMENT') {
@@ -204,7 +309,6 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Wire Deck Picker UI buttons to Swap Class of Selected Unit
   const deckButtons = document.querySelectorAll('.deck-card-btn');
   deckButtons.forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -511,7 +615,6 @@ window.addEventListener('DOMContentLoaded', () => {
           u.isStealthed = false;
         }
 
-        // EXECUTE ACTIVE SKILL
         if (action.type === 'SKILL' && action.skillType) {
           const sType = action.skillType as SkillType;
           const startPx = HexMath.hexToPixel(u.position, renderer.getHexRadius());
@@ -613,7 +716,6 @@ window.addEventListener('DOMContentLoaded', () => {
             await new Promise((r) => setTimeout(r, 300));
           }
         }
-        // REGULAR ATTACK
         else if (action.type === 'ATTACK' && targetUnit && targetUnit.hp > 0 && targetUnit.id !== u.id) {
           const stats = ArmyRegistry.getStats(attackerClass);
           const effectiveRange = TerrainMatrix.getEffectiveRange(stats.range, stats.category, attackerTerrain);
@@ -661,11 +763,18 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     };
 
-    await executeTeamTurn(playerUnits);
-    await new Promise((r) => setTimeout(r, 400));
-
-    await executeTeamTurn(botUnits);
-    await new Promise((r) => setTimeout(r, 400));
+    // Execute Team Turns according to AP Priority First Turn order!
+    if (firstTurnOwnerColor === '#3B82F6') {
+      await executeTeamTurn(playerUnits);
+      await new Promise((r) => setTimeout(r, 400));
+      await executeTeamTurn(botUnits);
+      await new Promise((r) => setTimeout(r, 400));
+    } else {
+      await executeTeamTurn(botUnits);
+      await new Promise((r) => setTimeout(r, 400));
+      await executeTeamTurn(playerUnits);
+      await new Promise((r) => setTimeout(r, 400));
+    }
 
     // FOREST STEALTH ENTRY CHECK
     for (const u of units) {
@@ -747,7 +856,6 @@ window.addEventListener('DOMContentLoaded', () => {
   canvas.addEventListener('click', (evt) => {
     const clickedHex = getCanvasHex(evt);
 
-    // DEPLOYMENT PHASE: Unit selection & swapping
     if (turnManager.getPhase() === 'DEPLOYMENT') {
       const clickedPlayerUnit = units.find(u => u.hp > 0 && u.ownerColor === '#3B82F6' && u.position.q === clickedHex.q && u.position.r === clickedHex.r);
       if (clickedPlayerUnit) {
@@ -756,7 +864,6 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // PLANNING PHASE
     if (turnManager.getPhase() !== 'PLANNING') return;
 
     const visibleHexes = FogOfWar.calculateVisibleHexes(units, '#3B82F6');
@@ -766,14 +873,12 @@ window.addEventListener('DOMContentLoaded', () => {
         FogOfWar.isEnemyUnitVisible(u, visibleHexes, '#3B82F6')
     );
 
-    // 1. CLICK ON ANY PLAYER UNIT -> Select unit
     if (clickedUnit && clickedUnit.ownerColor === '#3B82F6') {
       isTargetingSkillMode = false;
       selectUnit(clickedUnit);
       return;
     }
 
-    // 2. IF IN SKILL TARGETING MODE -> Strict Skill Range Check!
     if (isTargetingSkillMode && selectedUnit && !selectedUnit.hasActedThisRound) {
       const armyClass = (selectedUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId;
       const stats = ArmyRegistry.getStats(armyClass);
@@ -806,7 +911,6 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // 3. Click on Enemy Unit -> Assign Attack Action
     if (clickedUnit && clickedUnit.ownerColor === '#EF4444' && selectedUnit && !selectedUnit.hasActedThisRound) {
       const stats = ArmyRegistry.getStats((selectedUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId);
       const attackerTerrain = getTileTerrain(selectedUnit.position);
@@ -833,7 +937,6 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // 4. Click on Empty Reachable Hex -> Assign Move Action
     if (selectedUnit && selectedUnit.ownerColor === '#3B82F6' && !selectedUnit.hasActedThisRound) {
       const tile = tileMap.get(HexPathfinder.hexKey(clickedHex));
       if (tile && tile.blockedByUnit) return;
@@ -853,7 +956,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // UI Skill Button Event Listener: Assign Skill OR Cancel Assigned Skill (Undo)!
   document.getElementById('btn-skill')?.addEventListener('click', () => {
     if (selectedUnit && selectedUnit.ownerColor === '#3B82F6' && turnManager.getPhase() === 'PLANNING') {
       if (selectedUnit.hasActedThisRound) {
@@ -887,13 +989,102 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Procedural Map & Battle Reset Function
-  function generateNewBattlefield() {
-    generateProceduralMap();
+  // Random Map Generator Button Listener
+  document.getElementById('btn-random-map')?.addEventListener('click', () => {
+    if (turnManager.getPhase() === 'DEPLOYMENT') {
+      generateProceduralMap();
+      renderer.cacheTerrain(mapTiles);
+      const deckDrawer = document.getElementById('deck-drawer');
+      if (deckDrawer) {
+        floatingTexts.push({ x: 0, y: -40, text: '🎲 ĐÃ SINH BẢN ĐỒ MỚI!', color: '#10B981', alpha: 1.0 });
+      }
+    }
+  });
 
+  // Start Battle Button Listener -> Triggers Matchup Showcase Modal (3s Countdown + AP Priority)
+  document.getElementById('btn-start-battle')?.addEventListener('click', () => {
+    const matchupModal = document.getElementById('matchup-modal');
+    const playerApEl = document.getElementById('matchup-player-ap');
+    const enemyApEl = document.getElementById('matchup-enemy-ap');
+    const playerListEl = document.getElementById('matchup-player-list');
+    const enemyListEl = document.getElementById('matchup-enemy-list');
+    const bannerEl = document.getElementById('matchup-initiative-banner');
+    const countdownEl = document.getElementById('matchup-countdown');
+
+    const playerTotalAP = calculateSquadTotalAP('#3B82F6');
+    const enemyTotalAP = calculateSquadTotalAP('#EF4444');
+
+    if (playerTotalAP <= enemyTotalAP) {
+      firstTurnOwnerColor = '#3B82F6';
+      if (bannerEl) {
+        bannerEl.innerText = `👑 ĐỘI TA (Total AP: ${playerTotalAP}) NHẸ HƠN ĐỊCH (${enemyTotalAP} AP) -> BẠN ĐƯỢC ĐI TRƯỚC!`;
+        bannerEl.style.borderColor = '#3B82F6';
+        bannerEl.style.color = '#60A5FA';
+      }
+    } else {
+      firstTurnOwnerColor = '#EF4444';
+      if (bannerEl) {
+        bannerEl.innerText = `⚡ ĐỘI ĐỊCH (Total AP: ${enemyTotalAP}) NHẸ HƠN BẠN (${playerTotalAP} AP) -> ĐỊCH ĐƯỢC ĐI TRƯỚC!`;
+        bannerEl.style.borderColor = '#EF4444';
+        bannerEl.style.color = '#F87171';
+      }
+    }
+
+    if (playerApEl) playerApEl.innerText = `Tổng AP: ${playerTotalAP}`;
+    if (enemyApEl) enemyApEl.innerText = `Tổng AP: ${enemyTotalAP}`;
+
+    // Populate Squad Lists
+    if (playerListEl) {
+      playerListEl.innerHTML = units
+        .filter(u => u.ownerColor === '#3B82F6')
+        .map(u => {
+          const stats = ArmyRegistry.getStats(u.armyClass as ArmyClassId);
+          return `<div style="display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 8px;"><span>${u.name}</span><span style="color: #F59E0B;">${stats.actionCost} AP</span></div>`;
+        }).join('');
+    }
+
+    if (enemyListEl) {
+      enemyListEl.innerHTML = units
+        .filter(u => u.ownerColor === '#EF4444')
+        .map(u => {
+          const stats = ArmyRegistry.getStats(u.armyClass as ArmyClassId);
+          return `<div style="display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 8px;"><span>${u.name}</span><span style="color: #F59E0B;">${stats.actionCost} AP</span></div>`;
+        }).join('');
+    }
+
+    if (matchupModal) matchupModal.style.display = 'flex';
+
+    // 3-Second Countdown
+    let countdown = 3;
+    if (countdownEl) countdownEl.innerText = '3';
+
+    const timerInterval = setInterval(() => {
+      countdown--;
+      if (countdownEl) countdownEl.innerText = countdown.toString();
+
+      if (countdown <= 0) {
+        clearInterval(timerInterval);
+        if (matchupModal) matchupModal.style.display = 'none';
+
+        turnManager.setPhase('PLANNING');
+        const deckDrawer = document.getElementById('deck-drawer');
+        const globalTurnContainer = document.getElementById('global-turn-container');
+        const phaseTitle = document.getElementById('phase-title');
+
+        if (deckDrawer) deckDrawer.style.display = 'none';
+        if (globalTurnContainer) globalTurnContainer.style.display = 'block';
+        if (phaseTitle) phaseTitle.innerText = `Round 1 - Lập Kế Hoạch (${firstTurnOwnerColor === '#3B82F6' ? 'Bạn đi trước' : 'Địch đi trước'})`;
+
+        selectUnit(null);
+        startPlanningTimer();
+      }
+    }, 1000);
+  });
+
+  document.getElementById('btn-next-battle')?.addEventListener('click', () => {
+    generateProceduralMap();
     units.length = 0;
     units.push(...createDefaultUnits());
-
     renderer.cacheTerrain(mapTiles);
     updateTileOccupancy();
 
@@ -911,24 +1102,6 @@ window.addEventListener('DOMContentLoaded', () => {
     if (phaseTitle) phaseTitle.innerText = 'Phase Chuẩn Bị Xếp Quân';
 
     selectUnit(null);
-  }
-
-  document.getElementById('btn-start-battle')?.addEventListener('click', () => {
-    turnManager.setPhase('PLANNING');
-    const deckDrawer = document.getElementById('deck-drawer');
-    const globalTurnContainer = document.getElementById('global-turn-container');
-    const phaseTitle = document.getElementById('phase-title');
-
-    if (deckDrawer) deckDrawer.style.display = 'none';
-    if (globalTurnContainer) globalTurnContainer.style.display = 'block';
-    if (phaseTitle) phaseTitle.innerText = 'Round 1 - Lập Kế Hoạch';
-
-    selectUnit(null);
-    startPlanningTimer();
-  });
-
-  document.getElementById('btn-next-battle')?.addEventListener('click', () => {
-    generateNewBattlefield();
   });
 
   document.getElementById('btn-end-turn')?.addEventListener('click', () => {
@@ -978,7 +1151,8 @@ window.addEventListener('DOMContentLoaded', () => {
       pathPreviewCoords,
       floatingTexts,
       undefined,
-      turnManager.getPhase() !== 'DEPLOYMENT' ? visibleHexes : undefined
+      turnManager.getPhase() !== 'DEPLOYMENT' ? visibleHexes : undefined,
+      turnManager.getPhase() === 'DEPLOYMENT'
     );
 
     requestAnimationFrame(loop);

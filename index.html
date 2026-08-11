@@ -389,6 +389,9 @@
           <span>💣 Mãng Pháo</span> <span class="ap-tag">3 AP</span>
         </button>
       </div>
+      <button class="btn-action" id="btn-random-map" style="width: 100%; justify-content: center; background: rgba(16, 185, 129, 0.15); border-color: #10B981; color: #34D399; margin-top: 4px;">
+        🎲 Random Bản Đồ
+      </button>
       <button class="btn-action primary" id="btn-start-battle" style="width: 100%; justify-content: center; margin-top: 4px;">
         ⚔️ Bắt Đầu Trận Đấu
       </button>
@@ -409,6 +412,43 @@
       <button class="btn-action primary" id="btn-end-turn" style="padding: 12px 24px; font-size: 14px; font-weight: 800; border-radius: 16px; background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); box-shadow: 0 8px 25px rgba(37, 99, 235, 0.6); border: 1px solid #60A5FA;">
         🚀 Gửi Lượt (Lock Turn)
       </button>
+    </div>
+
+    <!-- Pre-Battle Matchup Showcase Modal (3s Countdown + AP Priority) -->
+    <div id="matchup-modal" class="modal-overlay" style="display: none;">
+      <div style="font-family: 'Outfit', sans-serif; font-size: 32px; font-weight: 800; color: #F8FAFC; text-transform: uppercase; letter-spacing: 1px;">
+        ⚔️ ĐỐI ĐẦU ĐỘI HÌNH TRẬN ĐẤU
+      </div>
+      <div id="matchup-initiative-banner" style="background: rgba(59, 130, 246, 0.2); border: 1px solid #3B82F6; padding: 10px 24px; border-radius: 999px; color: #60A5FA; font-weight: 800; font-size: 15px;">
+        👑 Đội Ta (11 AP) Nhẹ Hơn Địch (14 AP) -> BẠN ĐƯỢC ĐI TRƯỚC!
+      </div>
+      <div style="display: flex; gap: 32px; width: 680px; justify-content: space-between; margin: 12px 0;">
+        <!-- Player Squad Column -->
+        <div style="flex: 1; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 20px; padding: 16px;">
+          <div style="font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 800; color: #60A5FA; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; margin-bottom: 8px; display: flex; justify-content: space-between;">
+            <span>🛡️ ĐỘI TA</span>
+            <span id="matchup-player-ap" style="color: #F59E0B;">AP: 12</span>
+          </div>
+          <div id="matchup-player-list" style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; color: #F8FAFC;">
+          </div>
+        </div>
+
+        <!-- Enemy Squad Column -->
+        <div style="flex: 1; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 20px; padding: 16px;">
+          <div style="font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 800; color: #F87171; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; margin-bottom: 8px; display: flex; justify-content: space-between;">
+            <span>⚔️ ĐỘI ĐỊCH</span>
+            <span id="matchup-enemy-ap" style="color: #F59E0B;">AP: 14</span>
+          </div>
+          <div id="matchup-enemy-list" style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; color: #F8FAFC;">
+          </div>
+        </div>
+      </div>
+
+      <!-- 3s Countdown Badge -->
+      <div style="display: flex; align-items: center; gap: 12px; font-family: 'Outfit', sans-serif; font-size: 24px; font-weight: 800; color: #F59E0B;">
+        <span>Trận đấu bắt đầu sau:</span>
+        <span id="matchup-countdown" style="font-size: 42px; color: #10B981; min-width: 32px; text-align: center;">3</span>
+      </div>
     </div>
 
     <!-- Victory / Defeat Modal -->

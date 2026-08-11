@@ -99,9 +99,6 @@ export class Canvas2DRenderer {
     }
   }
 
-  /**
-   * Caches static 2D terrain background graphics with rich visual art style.
-   */
   public cacheTerrain(tiles: MapTileRenderData[]): void {
     const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
     const width = this.logicalWidth;
@@ -123,7 +120,6 @@ export class Canvas2DRenderer {
       const cx = centerX + pos.x;
       const cy = centerY + pos.y;
 
-      // 1. Base Hex Floor Color & Outer Grid Border
       this.drawHexagon(
         offCtx,
         cx,
@@ -133,7 +129,6 @@ export class Canvas2DRenderer {
         'rgba(30, 41, 59, 0.85)'
       );
 
-      // 2. Render Hand-Drawn Style Terrain Visual Graphics
       switch (tile.terrain) {
         case 'FOREST':
           this.drawForestTile(offCtx, cx, cy);
@@ -160,17 +155,13 @@ export class Canvas2DRenderer {
     }
   }
 
-  /**
-   * Renders clusters of detailed pine trees with ink outlines & highlights (Forest Art).
-   */
   private drawForestTile(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
-    // 5 Tree positions inside hex
     const treeOffsets = [
       { x: -8, y: -6, scale: 0.9 },
       { x: 7, y: -8, scale: 1.0 },
       { x: -10, y: 6, scale: 1.05 },
       { x: 4, y: 7, scale: 1.1 },
-      { x: 0, y: -1, scale: 1.2 } // Center front tree
+      { x: 0, y: -1, scale: 1.2 }
     ];
 
     for (const tree of treeOffsets) {
@@ -179,17 +170,14 @@ export class Canvas2DRenderer {
       const s = tree.scale;
 
       ctx.save();
-      // Tree Shadow
       ctx.beginPath();
       ctx.ellipse(tx, ty + 10 * s, 7 * s, 3 * s, 0, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
       ctx.fill();
 
-      // Brown Trunk
       ctx.fillStyle = '#4A2E19';
       ctx.fillRect(tx - 1.5 * s, ty + 2 * s, 3 * s, 8 * s);
 
-      // Tier 3 (Bottom Foliage)
       ctx.beginPath();
       ctx.moveTo(tx, ty - 6 * s);
       ctx.lineTo(tx + 9 * s, ty + 4 * s);
@@ -201,7 +189,6 @@ export class Canvas2DRenderer {
       ctx.lineWidth = 1.0;
       ctx.stroke();
 
-      // Tier 2 (Middle Foliage)
       ctx.beginPath();
       ctx.moveTo(tx, ty - 11 * s);
       ctx.lineTo(tx + 7 * s, ty - 1 * s);
@@ -211,7 +198,6 @@ export class Canvas2DRenderer {
       ctx.fill();
       ctx.stroke();
 
-      // Tier 1 (Top Tip)
       ctx.beginPath();
       ctx.moveTo(tx, ty - 16 * s);
       ctx.lineTo(tx + 5 * s, ty - 6 * s);
@@ -225,14 +211,11 @@ export class Canvas2DRenderer {
     }
   }
 
-  /**
-   * Renders jagged rocky mountain peaks with dark ink outlines & shading (Mountain Art).
-   */
   private drawMountainTile(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
     const peaks = [
       { x: -7, y: 3, w: 18, h: 20 },
       { x: 8, y: 4, w: 16, h: 18 },
-      { x: 0, y: -4, w: 22, h: 26 } // Tallest central peak
+      { x: 0, y: -4, w: 22, h: 26 }
     ];
 
     for (const peak of peaks) {
@@ -241,13 +224,11 @@ export class Canvas2DRenderer {
       const hw = peak.w / 2;
 
       ctx.save();
-      // Mountain Base Shadow
       ctx.beginPath();
       ctx.ellipse(px, py + 4, hw + 2, 4, 0, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
       ctx.fill();
 
-      // Shaded Left Slope (Dark Rocky Brown)
       ctx.beginPath();
       ctx.moveTo(px, py - peak.h);
       ctx.lineTo(px - hw, py + 4);
@@ -256,7 +237,6 @@ export class Canvas2DRenderer {
       ctx.fillStyle = '#5D4037';
       ctx.fill();
 
-      // Highlighted Right Slope (Warm Ochre/Tan)
       ctx.beginPath();
       ctx.moveTo(px, py - peak.h);
       ctx.lineTo(px + hw, py + 4);
@@ -265,7 +245,6 @@ export class Canvas2DRenderer {
       ctx.fillStyle = '#A1887F';
       ctx.fill();
 
-      // Dark Ink Outline
       ctx.beginPath();
       ctx.moveTo(px - hw, py + 4);
       ctx.lineTo(px, py - peak.h);
@@ -274,7 +253,6 @@ export class Canvas2DRenderer {
       ctx.lineWidth = 1.6;
       ctx.stroke();
 
-      // Ridge Line Down Center
       ctx.beginPath();
       ctx.moveTo(px, py - peak.h);
       ctx.lineTo(px - 1, py + 4);
@@ -282,7 +260,6 @@ export class Canvas2DRenderer {
       ctx.lineWidth = 1.2;
       ctx.stroke();
 
-      // Snow Cap on Top Peak
       ctx.beginPath();
       ctx.moveTo(px, py - peak.h);
       ctx.lineTo(px + 4, py - peak.h + 7);
@@ -295,12 +272,8 @@ export class Canvas2DRenderer {
     }
   }
 
-  /**
-   * Renders smooth rolling hill contours and mound ridges (High Ground Art).
-   */
   private drawHighGroundTile(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
     ctx.save();
-    // Rolling Hill Curves
     const hills = [
       { x: -6, y: -4, r: 12 },
       { x: 7, y: -2, r: 10 },
@@ -311,13 +284,11 @@ export class Canvas2DRenderer {
       const hx = cx + h.x;
       const hy = cy + h.y;
 
-      // Hill Mound Fill
       ctx.beginPath();
       ctx.arc(hx, hy, h.r, Math.PI * 0.9, Math.PI * 2.1);
       ctx.fillStyle = '#D9A74A';
       ctx.fill();
 
-      // Contour Ridge Line
       ctx.strokeStyle = '#8C671D';
       ctx.lineWidth = 1.4;
       ctx.stroke();
@@ -325,28 +296,21 @@ export class Canvas2DRenderer {
     ctx.restore();
   }
 
-  /**
-   * Renders crumbled ancient stone pillars and brick ruins (Ruins Art).
-   */
   private drawRuinsTile(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
     ctx.save();
     ctx.fillStyle = '#78909C';
     ctx.strokeStyle = '#263238';
     ctx.lineWidth = 1.4;
 
-    // Pillar 1 (Left broken)
     ctx.fillRect(cx - 12, cy - 8, 6, 16);
     ctx.strokeRect(cx - 12, cy - 8, 6, 16);
 
-    // Pillar 2 (Right tall)
     ctx.fillRect(cx + 6, cy - 14, 6, 22);
     ctx.strokeRect(cx + 6, cy - 14, 6, 22);
 
-    // Broken Arch Top
     ctx.fillRect(cx - 14, cy - 14, 14, 4);
     ctx.strokeRect(cx - 14, cy - 14, 14, 4);
 
-    // Scattered Stone Blocks
     ctx.fillRect(cx - 2, cy + 6, 7, 5);
     ctx.strokeRect(cx - 2, cy + 6, 7, 5);
     ctx.fillRect(cx + 10, cy + 5, 5, 4);
@@ -355,15 +319,11 @@ export class Canvas2DRenderer {
     ctx.restore();
   }
 
-  /**
-   * Renders blue water currents and wave ripple arcs (Water Art).
-   */
   private drawWaterTile(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
     ctx.save();
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
     ctx.lineWidth = 1.3;
 
-    // 3 Wave Ripples
     const waves = [
       { x: cx - 10, y: cy - 6, w: 12 },
       { x: cx + 2, y: cy + 2, w: 14 },
@@ -378,12 +338,8 @@ export class Canvas2DRenderer {
     ctx.restore();
   }
 
-  /**
-   * Renders cobblestone/dirt road track path (Road Art).
-   */
   private drawRoadTile(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
     ctx.save();
-    // Central Road Strip
     ctx.beginPath();
     ctx.arc(cx, cy, 14, 0, Math.PI * 2);
     ctx.fillStyle = '#D4B86A';
@@ -392,7 +348,6 @@ export class Canvas2DRenderer {
     ctx.lineWidth = 1.2;
     ctx.stroke();
 
-    // Small Cobblestones
     ctx.fillStyle = '#8C6F2D';
     const stones = [
       { x: -5, y: -4 }, { x: 4, y: -5 }, { x: -2, y: 3 }, { x: 5, y: 4 }
@@ -403,9 +358,6 @@ export class Canvas2DRenderer {
     ctx.restore();
   }
 
-  /**
-   * Renders subtle grass tufts and stippling (Ground Grassland Art).
-   */
   private drawGroundTile(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
     ctx.save();
     ctx.strokeStyle = '#558B2F';
@@ -458,7 +410,8 @@ export class Canvas2DRenderer {
     pathPreview?: HexCoord[],
     floatingTexts?: FloatingText[],
     deployZoneHexes?: HexCoord[],
-    visibleHexes?: Set<string>
+    visibleHexes?: Set<string>,
+    isDeploymentPhase?: boolean
   ): void {
     this.setupDPI();
 
@@ -478,7 +431,6 @@ export class Canvas2DRenderer {
 
     this.ctx.clearRect(0, 0, width, height);
 
-    // Static Background Terrain Cache
     if (!this.offscreenCanvas) {
       this.cacheTerrain(tiles);
     }
@@ -486,7 +438,6 @@ export class Canvas2DRenderer {
       this.ctx.drawImage(this.offscreenCanvas, shakeX, shakeY, width, height);
     }
 
-    // Fog of War Overlay
     if (visibleHexes) {
       for (const tile of tiles) {
         const hexKey = `${tile.coord.q},${tile.coord.r}`;
@@ -504,7 +455,6 @@ export class Canvas2DRenderer {
       }
     }
 
-    // Highlight Deployment Zone (Pre-Battle Deployment Phase)
     if (deployZoneHexes && deployZoneHexes.length > 0) {
       for (const hex of deployZoneHexes) {
         const pos = HexMath.hexToPixel(hex, this.hexRadius);
@@ -512,7 +462,6 @@ export class Canvas2DRenderer {
       }
     }
 
-    // Highlight Reachable Hexes
     if (highlightHexes) {
       for (const [key] of highlightHexes.entries()) {
         const [q, r] = key.split(',').map(Number);
@@ -521,7 +470,6 @@ export class Canvas2DRenderer {
       }
     }
 
-    // Draw Path Preview Line
     if (pathPreview && pathPreview.length > 1) {
       this.ctx.beginPath();
       for (let i = 0; i < pathPreview.length; i++) {
@@ -548,7 +496,7 @@ export class Canvas2DRenderer {
       const isBlue = unit.ownerColor === '#3B82F6';
       const hexKey = `${unit.position.q},${unit.position.r}`;
 
-      if (!isBlue) {
+      if (!isBlue && !isDeploymentPhase) {
         if (visibleHexes && !visibleHexes.has(hexKey)) continue;
         if (unit.isStealthed) continue;
       }
@@ -572,7 +520,9 @@ export class Canvas2DRenderer {
         this.ctx.globalAlpha = 0.45;
       }
 
-      this.drawUnit(this.ctx, px, py, unit, isSelected);
+      // In Deployment Phase, enemy units are hidden silhouettes!
+      const isHiddenEnemyInDeployment = !isBlue && isDeploymentPhase;
+      this.drawUnit(this.ctx, px, py, unit, isSelected, isHiddenEnemyInDeployment);
 
       this.ctx.restore();
 
@@ -582,10 +532,8 @@ export class Canvas2DRenderer {
       }
     }
 
-    // Render Flying VFX Projectiles & Particle Effects Layer
     this.vfxManager.updateAndRender(this.ctx, centerX, centerY);
 
-    // Floating Text Popups
     if (floatingTexts) {
       for (const ft of floatingTexts) {
         this.ctx.save();
@@ -599,7 +547,7 @@ export class Canvas2DRenderer {
     }
   }
 
-  private drawUnit(ctx: CanvasRenderingContext2D, x: number, y: number, unit: RenderableUnit, isSelected: boolean): void {
+  private drawUnit(ctx: CanvasRenderingContext2D, x: number, y: number, unit: RenderableUnit, isSelected: boolean, isHiddenEnemy?: boolean): void {
     let drawX = x;
     let drawY = y;
 
@@ -644,10 +592,8 @@ export class Canvas2DRenderer {
 
     const isActed = unit.hasActedThisRound;
     const isBlue = unit.ownerColor === '#3B82F6';
-    const tunicColor = isActed ? '#64748B' : (isBlue ? '#2563EB' : '#DC2626');
-    const skinColor = '#FDBA74';
-    const armorColor = isActed ? '#475569' : '#CBD5E1';
-    const weaponColor = '#E2E8F0';
+    const tunicColor = isHiddenEnemy ? '#1E293B' : (isActed ? '#64748B' : (isBlue ? '#2563EB' : '#DC2626'));
+    const skinColor = isHiddenEnemy ? '#334155' : '#FDBA74';
 
     ctx.save();
 
@@ -656,7 +602,7 @@ export class Canvas2DRenderer {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
     ctx.fill();
 
-    const cls = unit.armyClass || unit.category;
+    const cls = isHiddenEnemy ? 'HIDDEN' : (unit.armyClass || unit.category);
 
     if (cls.includes('CAVALRY') || cls === 'HORSE_ARCHER') {
       ctx.fillStyle = cls === 'HEAVY_CAVALRY' ? '#334155' : '#78350F';
@@ -677,19 +623,6 @@ export class Canvas2DRenderer {
       ctx.arc(drawX + 2, drawY - 15, 5, 0, Math.PI * 2);
       ctx.fillStyle = skinColor;
       ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(drawX + 2, drawY - 17, 5, Math.PI, Math.PI * 2);
-      ctx.fillStyle = isBlue ? '#1E40AF' : '#991B1B';
-      ctx.fill();
-    } else if (cls === 'CATAPULT') {
-      ctx.fillStyle = '#92400E';
-      ctx.fillRect(drawX - 16, drawY - 2, 32, 12);
-      ctx.fillStyle = '#451A03';
-      ctx.beginPath();
-      ctx.arc(drawX - 10, drawY + 10, 5, 0, Math.PI * 2);
-      ctx.arc(drawX + 10, drawY + 10, 5, 0, Math.PI * 2);
-      ctx.fill();
     } else {
       ctx.fillStyle = '#1E293B';
       ctx.fillRect(drawX - 6, drawY + 4, 4, 10);
@@ -707,19 +640,19 @@ export class Canvas2DRenderer {
 
       ctx.beginPath();
       ctx.arc(drawX, drawY - 16, 6, Math.PI, Math.PI * 2);
-      ctx.fillStyle = isBlue ? '#1E40AF' : '#991B1B';
+      ctx.fillStyle = isHiddenEnemy ? '#475569' : (isBlue ? '#1E40AF' : '#991B1B');
       ctx.fill();
     }
     ctx.restore();
 
-    // Floating Circular Unit Icon Badge (Positioned drawY - 48)
+    // Floating Circular Badge (Hidden Enemy gets '❓')
     const flagY = drawY - 48;
     ctx.save();
     ctx.beginPath();
     ctx.arc(drawX, flagY, 12, 0, Math.PI * 2);
-    ctx.fillStyle = isActed ? '#475569' : (isBlue ? '#1E3A8A' : '#7F1D1D');
+    ctx.fillStyle = isHiddenEnemy ? '#334155' : (isActed ? '#475569' : (isBlue ? '#1E3A8A' : '#7F1D1D'));
     ctx.fill();
-    ctx.strokeStyle = isActed ? '#94A3B8' : (isBlue ? '#60A5FA' : '#F87171');
+    ctx.strokeStyle = isHiddenEnemy ? '#64748B' : (isActed ? '#94A3B8' : (isBlue ? '#60A5FA' : '#F87171'));
     ctx.lineWidth = 2.5;
     ctx.stroke();
 
@@ -728,23 +661,24 @@ export class Canvas2DRenderer {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    const icon = unit.isStealthed ? '🥷' : this.getArmyIcon(unit.armyClass || unit.category);
+    const icon = isHiddenEnemy ? '❓' : (unit.isStealthed ? '🥷' : this.getArmyIcon(unit.armyClass || unit.category));
     ctx.fillText(icon, drawX, flagY);
     ctx.restore();
 
-    // Health Bar (drawY - 68)
-    const barW = 34;
-    const barH = 5;
-    const hpRatio = Math.max(0, unit.hp / unit.maxHp);
-    const barY = drawY - 68;
+    if (!isHiddenEnemy) {
+      const barW = 34;
+      const barH = 5;
+      const hpRatio = Math.max(0, unit.hp / unit.maxHp);
+      const barY = drawY - 68;
 
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-    ctx.fillRect(drawX - barW / 2, barY, barW, barH);
-    ctx.fillStyle = hpRatio > 0.5 ? '#10B981' : hpRatio > 0.25 ? '#F59E0B' : '#EF4444';
-    ctx.fillRect(drawX - barW / 2, barY, barW * hpRatio, barH);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(drawX - barW / 2, barY, barW, barH);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+      ctx.fillRect(drawX - barW / 2, barY, barW, barH);
+      ctx.fillStyle = hpRatio > 0.5 ? '#10B981' : hpRatio > 0.25 ? '#F59E0B' : '#EF4444';
+      ctx.fillRect(drawX - barW / 2, barY, barW * hpRatio, barH);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(drawX - barW / 2, barY, barW, barH);
+    }
   }
 
   private getArmyIcon(armyClassOrCategory?: string): string {
