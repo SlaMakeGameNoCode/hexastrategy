@@ -775,6 +775,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // FIX BUG-0002: Try to start battle when both players ready (or auto after 30s)
   function pvpTryStartBattle(): void {
     if (pvpBattleReadyMe && pvpBattleReadyOpponent) {
+      showPvpWaiting(false);
       actuallyStartBattle();
     } else if (pvpBattleReadyMe) {
       // Show waiting overlay — opponent hasn't clicked yet
@@ -1443,12 +1444,12 @@ window.addEventListener('DOMContentLoaded', () => {
       pvpBattleReadyMe = true;
       lobbyManager.sendGameAction('BATTLE_START', []);
       pvpTryStartBattle();
-      // Auto-start after 30 seconds even if opponent hasn't clicked
+      // Auto-start after 15 seconds even if opponent hasn't clicked
       if (!pvpBattleAutoTimer) {
         pvpBattleAutoTimer = setTimeout(() => {
           pvpBattleReadyOpponent = true;
           pvpTryStartBattle();
-        }, 30000);
+        }, 15000);
       }
       return;
     }
