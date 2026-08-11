@@ -28,9 +28,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
   /**
    * Procedurally generates a randomized terrain map following strict Game Design Rules:
-   * - Forest: Clusters of >= 3 adjacent tiles (Capped <= 40% area)
-   * - Mountains: Capped <= 25% area, guaranteed open solvability path from Player to Enemy
-   * - High Ground, Ruins, Water, & Winding Road Highways
+   * - Forest: Clusters of >= 3 adjacent tiles (Capped <= 38% area)
+   * - Internal Mountains: Mountain ranges & peaks generated INSIDE the map (Capped <= 22% area)
+   * - Solvability Guarantee: A* Path verified from Player to Enemy, opening mountain passes if blocked.
    */
   function generateProceduralMap() {
     mapTiles.length = 0;
@@ -61,12 +61,11 @@ window.addEventListener('DOMContentLoaded', () => {
     const numForestSeeds = biomeType === 0 ? 6 : Math.floor(Math.random() * 3) + 4;
     for (let s = 0; s < numForestSeeds; s++) {
       if (forestCount >= maxForest) break;
-      const randCol = Math.floor(Math.random() * 10) - 5; // col from -5 to 4
-      const randR = Math.floor(Math.random() * 8) - 4;   // r from -4 to 3
+      const randCol = Math.floor(Math.random() * 10) - 5;
+      const randR = Math.floor(Math.random() * 8) - 4;
       const randQ = randCol - Math.floor(randR / 2);
       const seedHex: HexCoord = { q: randQ, r: randR };
 
-      // Forest cluster (seed + adjacent neighbors = >= 3 tiles)
       const cluster = [seedHex, ...HexMath.getNeighbors(seedHex)];
       for (const hex of cluster) {
         if (forestCount >= maxForest) break;
@@ -142,26 +141,23 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // 8. Generate Mountain Barriers (Capped <= 22%)
-    for (let r = -6; r <= 6; r++) {
+    // 8. Generate INTERNAL & Flank Mountain Ridges INSIDE the Map Grid
+    const numMountainSeeds = biomeType === 1 ? 5 : Math.floor(Math.random() * 3) + 3;
+    for (let s = 0; s < numMountainSeeds; s++) {
       if (mountainCount >= maxMountain) break;
+      const randCol = Math.floor(Math.random() * 12) - 6; // col from -6 to 5 inside map!
+      const randR = Math.floor(Math.random() * 8) - 4;    // r from -4 to 3 inside map!
+      const randQ = randCol - Math.floor(randR / 2);
+      const seedHex: HexCoord = { q: randQ, r: randR };
 
-      // Flank Mountain Boundaries
-      const leftQ = -7 - Math.floor(r / 2);
-      const rightQ = 7 - Math.floor(r / 2);
-
-      const leftTile = tileMap.get(`${leftQ},${r}`);
-      if (leftTile) { leftTile.terrain = 'MOUNTAIN'; mountainCount++; }
-
-      const rightTile = tileMap.get(`${rightQ},${r}`);
-      if (rightTile) { rightTile.terrain = 'MOUNTAIN'; mountainCount++; }
-
-      if (biomeType === 1 && (r === -2 || r === 2)) {
-        const midCol = Math.floor(Math.random() * 4) - 2;
-        const midQ = midCol - Math.floor(r / 2);
-        const midTile = tileMap.get(`${midQ},${r}`);
-        if (midTile && midTile.terrain === 'GROUND') {
-          midTile.terrain = 'MOUNTAIN';
+      // Mountain ridge cluster (2 to 4 adjacent mountain tiles)
+      const mCluster = [seedHex, ...HexMath.getNeighbors(seedHex).slice(0, 3)];
+      for (const hex of mCluster) {
+        if (mountainCount >= maxMountain) break;
+        const key = HexPathfinder.hexKey(hex);
+        const tile = tileMap.get(key);
+        if (tile && tile.terrain === 'GROUND') {
+          tile.terrain = 'MOUNTAIN';
           mountainCount++;
         }
       }
@@ -174,7 +170,7 @@ window.addEventListener('DOMContentLoaded', () => {
     let testPath = HexPathfinder.findPath(playerStart, enemyStart, 999, 'INFANTRY', (coord) => tileMap.get(HexPathfinder.hexKey(coord)));
 
     if (!testPath) {
-      // Break mountain obstacles along central corridor to open a Mountain Pass path!
+      // Break internal mountain obstacles along central corridor to open a Mountain Pass path!
       for (let r = 5; r >= -5; r--) {
         const col = 0;
         const q = col - Math.floor(r / 2);
@@ -603,7 +599,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     const executeTeamTurn = async (teamUnits: RenderableUnit[]) => {
-      // 1. Movement Phase
+      // 1. Movement Phase (Supports automatic move-and-attack for melee/ranged out of range)
       for (const u of teamUnits) {
         if (u.hp <= 0) continue;
         const action = u.assignedAction;
