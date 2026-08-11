@@ -43,3 +43,14 @@
 
 **Story Type**: UI  
 **Required evidence**: `tests/unit/ui/hud_overlay_test.ts` — must exist and pass.  
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-08-11  
+**Criteria**: 5/5 passing (All ACs met)  
+**Deviations**: None  
+**Test Evidence**: `tests/unit/ui/hud_overlay_test.ts` (4/4 unit tests passing)  
+**Code Review**: Complete (Verdict: APPROVED)  
+
