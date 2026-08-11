@@ -70,6 +70,13 @@ export class LobbyManager {
             status: 'online'
           }
         }));
+
+        // Heartbeat 5s ping to prevent Render idle disconnection
+        setInterval(() => {
+          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ type: 'PING' }));
+          }
+        }, 5000);
       }
     };
 

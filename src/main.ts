@@ -1355,7 +1355,14 @@ window.addEventListener('DOMContentLoaded', () => {
       const tile = tileMap.get(HexPathfinder.hexKey(clickedHex));
       if (tile && tile.blockedByUnit) return;
 
-      const pathRes = pathOverlay.getPathPreview(clickedHex, getTileForPathfinding);
+      const pathRes = HexPathfinder.findPath(
+        selectedUnit.position,
+        clickedHex,
+        ArmyRegistry.getStats((selectedUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId).movementPoints,
+        selectedUnit.category,
+        getTileForPathfinding
+      );
+
       if (pathRes && pathRes.path.length > 1) {
         const stats = ArmyRegistry.getStats((selectedUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId);
         const currentAP = hud.getAPRemaining();
