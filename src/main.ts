@@ -789,7 +789,7 @@ window.addEventListener('DOMContentLoaded', () => {
             const attackerPos = HexMath.hexToPixel(u.position, renderer.getHexRadius());
             const targetPos = HexMath.hexToPixel(targetUnit.position, renderer.getHexRadius());
 
-            let projType: ProjectileType = u.category === 'ARCHER' ? 'FIRE_ARROW' : 'SLASH_WAVE';
+            let projType: ProjectileType = u.category === 'ARCHER' ? 'REGULAR_ARROW' : 'SLASH_WAVE';
             if (attackerClass.includes('CROSSBOW')) projType = 'CROSSBOW_BOLT';
             else if (attackerClass === 'CATAPULT') projType = 'CATAPULT_BOULDER';
 

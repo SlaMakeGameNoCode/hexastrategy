@@ -1,4 +1,5 @@
 export type ProjectileType =
+  | 'REGULAR_ARROW'
   | 'FIRE_ARROW'
   | 'CROSSBOW_BOLT'
   | 'CATAPULT_BOULDER'
@@ -15,7 +16,7 @@ export interface VFXProjectile {
   targetY: number;
   currentX: number;
   currentY: number;
-  progress: number; // 0.0 to 1.0
+  progress: number;
   speed: number;
   arcHeight: number;
   type: ProjectileType;
@@ -59,95 +60,61 @@ export class VFXManager {
   private rings: RingEffect[] = [];
   private groundFlames: GroundFlame[] = [];
 
-  public spawnVolleyFireArrows(
-    startX: number,
-    startY: number,
-    targetX: number,
-    targetY: number,
-    onImpact?: () => void
-  ): void {
-    const arrowCount = 5;
-    for (let i = 0; i < arrowCount; i++) {
-      const offsetX = (Math.random() - 0.5) * 24;
-      const offsetY = (Math.random() - 0.5) * 24;
-      const isLast = i === arrowCount - 1;
-
-      this.projectiles.push({
-        id: `fa_${Date.now()}_${i}`,
-        startX: startX + (Math.random() - 0.5) * 12,
-        startY: startY + (Math.random() - 0.5) * 12,
-        targetX: targetX + offsetX,
-        targetY: targetY + offsetY,
-        currentX: startX,
-        currentY: startY,
-        progress: 0,
-        speed: 0.038 + Math.random() * 0.01,
-        arcHeight: 40 + Math.random() * 20,
-        type: 'FIRE_ARROW',
-        color: i % 2 === 0 ? '#EF4444' : '#F97316',
-        delayFrames: i * 4,
-        onImpact: isLast ? () => {
-          this.spawnBurningGround(targetX, targetY);
-          if (onImpact) onImpact();
-        } : undefined
-      });
-    }
-  }
-
   public spawnProjectile(
     startX: number,
     startY: number,
     targetX: number,
     targetY: number,
     type: ProjectileType,
-    onImpact?: () => void
+    onImpact?: () => void,
+    delayFrames: number = 0
   ): void {
-    if (type === 'FIRE_ARROW') {
-      this.spawnVolleyFireArrows(startX, startY, targetX, targetY, onImpact);
-      return;
-    }
-
-    let speed = 0.04;
-    let arcHeight = 0;
     let color = '#F59E0B';
+    let speed = 0.045;
+    let arcHeight = 35;
 
-    if (type === 'CROSSBOW_BOLT') {
-      speed = 0.09;
-      arcHeight = 0;
-      color = '#38BDF8';
-    } else if (type === 'CATAPULT_BOULDER') {
-      speed = 0.025;
-      arcHeight = 85;
-      color = '#EA580C';
-    } else if (type === 'SLASH_WAVE') {
-      speed = 0.06;
-      arcHeight = 10;
+    if (type === 'REGULAR_ARROW') {
+      color = '#CBD5E1';
+      speed = 0.05;
+      arcHeight = 25;
+    } else if (type === 'FIRE_ARROW') {
+      color = '#F97316';
+      speed = 0.04;
+      arcHeight = 35;
+    } else if (type === 'CROSSBOW_BOLT') {
       color = '#E2E8F0';
+      speed = 0.08;
+      arcHeight = 8;
+    } else if (type === 'CATAPULT_BOULDER') {
+      color = '#78350F';
+      speed = 0.025;
+      arcHeight = 70;
     }
 
     this.projectiles.push({
-      id: `p_${Date.now()}_${Math.random()}`,
+      id: `proj_${Date.now()}_${Math.random()}`,
       startX,
       startY,
       targetX,
       targetY,
       currentX: startX,
       currentY: startY,
-      progress: 0,
+      progress: 0.0,
       speed,
       arcHeight,
       type,
       color,
+      delayFrames,
       onImpact
     });
   }
 
-  public spawnBurningGround(x: number, y: number): void {
+  public spawnGroundFlame(x: number, y: number): void {
     this.groundFlames.push({
       x,
       y,
       life: 0,
-      maxLife: 90 // Flames burn for ~1.5s
+      maxLife: 90
     });
   }
 
@@ -204,7 +171,6 @@ export class VFXManager {
   }
 
   public spawnCavalryWindTrail(x: number, y: number, angle: number): void {
-    // Wind Cleaving Streak particles
     for (let i = 0; i < 4; i++) {
       const spd = Math.random() * 4 + 2;
       this.particles.push({
@@ -222,7 +188,7 @@ export class VFXManager {
   }
 
   public updateAndRender(ctx: CanvasRenderingContext2D, centerX: number, centerY: number): void {
-    // 1. Render & Update Ground Flames (Fire Arrow impact site)
+    // 1. Render Ground Flames
     for (let i = this.groundFlames.length - 1; i >= 0; i--) {
       const gf = this.groundFlames[i];
       gf.life += 1;
@@ -232,7 +198,6 @@ export class VFXManager {
         continue;
       }
 
-      // Spawn active flickering flame particles
       if (Math.random() < 0.7) {
         const fx = gf.x + (Math.random() - 0.5) * 22;
         const fy = gf.y + (Math.random() - 0.5) * 22;
@@ -248,21 +213,13 @@ export class VFXManager {
           maxLife: 16
         });
       }
-
-      // Draw charred ember patch underneath
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(centerX + gf.x, centerY + gf.y, 16, 8, 0, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
-      ctx.fill();
-      ctx.restore();
     }
 
-    // 2. Render & Update Rings / Phalanx Barriers
+    // 2. Render Expand Rings
     for (let i = this.rings.length - 1; i >= 0; i--) {
       const r = this.rings[i];
       r.radius += (r.maxRadius - r.radius) * 0.15;
-      r.alpha -= 0.03;
+      r.alpha -= 0.04;
 
       if (r.alpha <= 0 || r.radius >= r.maxRadius - 1) {
         this.rings.splice(i, 1);
@@ -275,7 +232,6 @@ export class VFXManager {
       ctx.lineWidth = 3.5;
 
       if (r.shape === 'DIAMOND') {
-        // Draw Solid Diamond/Triangle Phalanx Shield Barrier
         const rad = r.radius;
         const px = centerX + r.x;
         const py = centerY + r.y;
@@ -297,7 +253,7 @@ export class VFXManager {
       ctx.restore();
     }
 
-    // 3. Render & Update Projectiles
+    // 3. Render Projectiles
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const proj = this.projectiles[i];
 
@@ -321,7 +277,7 @@ export class VFXManager {
 
       ctx.save();
 
-      // Flame/Smoke Trail behind Fire Arrows
+      // Flame/Smoke Trail ONLY behind FIRE_ARROW
       if (proj.type === 'FIRE_ARROW' && Math.random() < 0.8) {
         this.particles.push({
           x: proj.currentX,
@@ -352,19 +308,31 @@ export class VFXManager {
         ctx.moveTo(centerX + renderX - dx * 0.08, centerY + renderY - dy * 0.08);
         ctx.lineTo(centerX + renderX, centerY + renderY);
         ctx.stroke();
-      } else {
-        // Fire Arrow Streak
-        ctx.strokeStyle = proj.color;
-        ctx.lineWidth = 2.5;
+      } else if (proj.type === 'REGULAR_ARROW') {
+        // Standard Wooden Arrow (Steel Tip + White Fletching)
+        ctx.strokeStyle = '#94A3B8';
+        ctx.lineWidth = 2.0;
         ctx.beginPath();
         ctx.moveTo(centerX + renderX - dx * 0.06, centerY + renderY - dy * 0.06 - 2);
         ctx.lineTo(centerX + renderX, centerY + renderY);
         ctx.stroke();
 
-        // Glowing Arrow Tip
+        ctx.fillStyle = '#E2E8F0';
+        ctx.beginPath();
+        ctx.arc(centerX + renderX, centerY + renderY, 2.0, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Fire Arrow Streak
+        ctx.strokeStyle = proj.color;
+        ctx.lineWidth = 2.8;
+        ctx.beginPath();
+        ctx.moveTo(centerX + renderX - dx * 0.06, centerY + renderY - dy * 0.06 - 2);
+        ctx.lineTo(centerX + renderX, centerY + renderY);
+        ctx.stroke();
+
         ctx.fillStyle = '#FEF08A';
         ctx.beginPath();
-        ctx.arc(centerX + renderX, centerY + renderY, 2.5, 0, Math.PI * 2);
+        ctx.arc(centerX + renderX, centerY + renderY, 3.0, 0, Math.PI * 2);
         ctx.fill();
       }
 
@@ -372,7 +340,11 @@ export class VFXManager {
 
       if (p >= 1.0) {
         if (proj.onImpact) proj.onImpact();
-        this.spawnExplosion(proj.targetX, proj.targetY, proj.color, 16);
+        if (proj.type === 'FIRE_ARROW' || proj.type === 'CATAPULT_BOULDER') {
+          this.spawnExplosion(proj.targetX, proj.targetY, proj.color, 18);
+        } else {
+          this.spawnExplosion(proj.targetX, proj.targetY, '#94A3B8', 6);
+        }
         this.projectiles.splice(i, 1);
       }
     }
@@ -383,9 +355,9 @@ export class VFXManager {
       pt.x += pt.vx;
       pt.y += pt.vy;
       pt.life += 1;
-      pt.alpha = 1.0 - (pt.life / pt.maxLife);
+      pt.alpha -= 0.03;
 
-      if (pt.life >= pt.maxLife) {
+      if (pt.life >= pt.maxLife || pt.alpha <= 0) {
         this.particles.splice(i, 1);
         continue;
       }
@@ -398,12 +370,5 @@ export class VFXManager {
       ctx.fill();
       ctx.restore();
     }
-  }
-
-  public clearAll(): void {
-    this.projectiles = [];
-    this.particles = [];
-    this.rings = [];
-    this.groundFlames = [];
   }
 }
