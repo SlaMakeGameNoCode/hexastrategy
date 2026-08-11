@@ -1536,7 +1536,8 @@ window.addEventListener('DOMContentLoaded', () => {
       if (ft.alpha <= 0) floatingTexts.splice(i, 1);
     }
 
-    const visibleHexes = FogOfWar.calculateVisibleHexes(units, '#3B82F6');
+    const myColor = pvpMode ? myPvpColor : '#3B82F6';
+    const visibleHexes = FogOfWar.calculateVisibleHexes(units, myColor);
 
     renderer.renderFrame(
       mapTiles,
@@ -1548,7 +1549,8 @@ window.addEventListener('DOMContentLoaded', () => {
       undefined,
       turnManager.getPhase() !== 'DEPLOYMENT' ? visibleHexes : undefined,
       turnManager.getPhase() === 'DEPLOYMENT',
-      pvpMode && myPvpColor === '#EF4444'
+      pvpMode && myPvpColor === '#EF4444',
+      myColor
     );
 
     requestAnimationFrame(loop);

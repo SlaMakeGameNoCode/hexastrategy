@@ -420,7 +420,8 @@ export class Canvas2DRenderer {
     deployZoneHexes?: HexCoord[],
     visibleHexes?: Set<string>,
     isDeploymentPhase?: boolean,
-    isFlipped?: boolean
+    isFlipped?: boolean,
+    playerColor?: string
   ): void {
     this.setupDPI();
 
@@ -504,13 +505,14 @@ export class Canvas2DRenderer {
     }
 
     // Render Units
+    const myColor = playerColor || '#3B82F6';
     for (const unit of units) {
       if (unit.hp <= 0) continue;
 
-      const isBlue = unit.ownerColor === '#3B82F6';
+      const isMyUnit = unit.ownerColor === myColor;
       const hexKey = `${unit.position.q},${unit.position.r}`;
 
-      if (!isBlue && !isDeploymentPhase) {
+      if (!isMyUnit && !isDeploymentPhase) {
         if (visibleHexes && !visibleHexes.has(hexKey)) continue;
         if (unit.isStealthed) continue;
       }
@@ -531,11 +533,11 @@ export class Canvas2DRenderer {
       const isSelected = selectedUnitId === unit.id;
 
       this.ctx.save();
-      if (isBlue && unit.isStealthed) {
+      if (isMyUnit && unit.isStealthed) {
         this.ctx.globalAlpha = 0.45;
       }
 
-      const isHiddenEnemyInDeployment = !isBlue && isDeploymentPhase;
+      const isHiddenEnemyInDeployment = !isMyUnit && isDeploymentPhase;
       this.drawUnit(this.ctx, px, py, unit, isSelected, isHiddenEnemyInDeployment);
 
       this.ctx.restore();
