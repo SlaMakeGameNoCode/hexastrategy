@@ -44,19 +44,10 @@ const server = http.createServer((req, res) => {
 // Real-Time PvP & Lobby WebSocket Server
 const wss = new WebSocketServer({ server });
 
-interface LobbyClient {
-  ws: WebSocket;
-  user: {
-    uid: string;
-    displayName: string;
-    wins: number;
-    losses: number;
-    status: 'online' | 'in_match';
-  };
-}
-
-const connectedClients = new Map<string, LobbyClient>();
-const activeRooms = new Map<string, { player1Uid: string; player2Uid: string }>();
+// Map: uid -> { ws, user }
+const connectedClients = new Map();
+// Map: roomId -> { player1Uid, player2Uid }
+const activeRooms = new Map();
 
 function broadcastLobbyState() {
   const usersList = Array.from(connectedClients.values()).map(c => c.user);
@@ -73,7 +64,7 @@ function broadcastLobbyState() {
 }
 
 wss.on('connection', (ws) => {
-  let clientUid: string | null = null;
+  let clientUid = null;
 
   ws.on('message', (message) => {
     try {
@@ -90,7 +81,7 @@ wss.on('connection', (ws) => {
 
         case 'SEND_CHALLENGE':
           if (data.toUid && connectedClients.has(data.toUid)) {
-            const targetClient = connectedClients.get(data.toUid)!;
+            const targetClient = connectedClients.get(data.toUid);
             if (targetClient.ws.readyState === WebSocket.OPEN) {
               targetClient.ws.send(JSON.stringify({
                 type: 'CHALLENGE_REQUEST',
@@ -103,13 +94,12 @@ wss.on('connection', (ws) => {
 
         case 'RESPOND_CHALLENGE':
           if (data.toUid && connectedClients.has(data.toUid)) {
-            const challengerClient = connectedClients.get(data.toUid)!;
+            const challengerClient = connectedClients.get(data.toUid);
             if (data.accepted) {
               const roomId = `room_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
               activeRooms.set(roomId, { player1Uid: data.toUid, player2Uid: data.fromUid });
 
-              // Notify both clients to start match!
-              const matchMsg = (isChallenger: boolean) => JSON.stringify({
+              const matchMsg = JSON.stringify({
                 type: 'MATCH_START',
                 roomId,
                 fromUid: data.toUid,
@@ -117,10 +107,10 @@ wss.on('connection', (ws) => {
               });
 
               if (challengerClient.ws.readyState === WebSocket.OPEN) {
-                challengerClient.ws.send(matchMsg(true));
+                challengerClient.ws.send(matchMsg);
               }
               if (ws.readyState === WebSocket.OPEN) {
-                ws.send(matchMsg(false));
+                ws.send(matchMsg);
               }
             } else {
               if (challengerClient.ws.readyState === WebSocket.OPEN) {
@@ -136,7 +126,7 @@ wss.on('connection', (ws) => {
 
         case 'SURRENDER_MATCH':
           if (data.roomId && activeRooms.has(data.roomId)) {
-            const room = activeRooms.get(data.roomId)!;
+            const room = activeRooms.get(data.roomId);
             const opponentUid = room.player1Uid === data.fromUid ? room.player2Uid : room.player1Uid;
             const opponentClient = connectedClients.get(opponentUid);
 
