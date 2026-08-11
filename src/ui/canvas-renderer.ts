@@ -520,7 +520,6 @@ export class Canvas2DRenderer {
         this.ctx.globalAlpha = 0.45;
       }
 
-      // In Deployment Phase, enemy units are hidden silhouettes!
       const isHiddenEnemyInDeployment = !isBlue && isDeploymentPhase;
       this.drawUnit(this.ctx, px, py, unit, isSelected, isHiddenEnemyInDeployment);
 
@@ -597,6 +596,7 @@ export class Canvas2DRenderer {
 
     ctx.save();
 
+    // Unit Ground Shadow
     ctx.beginPath();
     ctx.ellipse(drawX, drawY + 12, 14, 6, 0, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
@@ -605,15 +605,18 @@ export class Canvas2DRenderer {
     const cls = isHiddenEnemy ? 'HIDDEN' : (unit.armyClass || unit.category);
 
     if (cls.includes('CAVALRY') || cls === 'HORSE_ARCHER') {
+      // FULL HORSE BODY SPRITE WITH RIDER
       ctx.fillStyle = cls === 'HEAVY_CAVALRY' ? '#334155' : '#78350F';
       ctx.beginPath();
       ctx.ellipse(drawX, drawY + 4, 16, 10, 0, 0, Math.PI * 2);
       ctx.fill();
 
+      // Horse Head & Neck
       ctx.beginPath();
       ctx.ellipse(drawX - 10, drawY - 4, 7, 10, -0.4, 0, Math.PI * 2);
       ctx.fill();
 
+      // Mounted Rider Body & Head
       ctx.beginPath();
       ctx.arc(drawX + 2, drawY - 6, 8, 0, Math.PI * 2);
       ctx.fillStyle = tunicColor;
@@ -623,7 +626,51 @@ export class Canvas2DRenderer {
       ctx.arc(drawX + 2, drawY - 15, 5, 0, Math.PI * 2);
       ctx.fillStyle = skinColor;
       ctx.fill();
+
+      // Mounted Weapon
+      if (cls === 'HORSE_ARCHER') {
+        ctx.strokeStyle = '#B45309';
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.arc(drawX + 8, drawY - 12, 9, -Math.PI * 0.4, Math.PI * 0.4);
+        ctx.stroke();
+      } else {
+        ctx.strokeStyle = '#CBD5E1';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(drawX + 4, drawY - 6);
+        ctx.lineTo(drawX + 18, drawY - 18);
+        ctx.stroke();
+      }
+    } else if (cls === 'CATAPULT') {
+      // HEAVY SIEGE CATAPULT ENGINE SPRITE
+      ctx.fillStyle = '#78350F';
+      ctx.strokeStyle = '#451A03';
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(drawX - 14, drawY - 4, 28, 12);
+      ctx.strokeRect(drawX - 14, drawY - 4, 28, 12);
+
+      // Wheels
+      ctx.fillStyle = '#475569';
+      ctx.beginPath();
+      ctx.arc(drawX - 10, drawY + 8, 5, 0, Math.PI * 2);
+      ctx.arc(drawX + 10, drawY + 8, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Throwing Arm & Boulder
+      ctx.strokeStyle = '#B45309';
+      ctx.lineWidth = 3.0;
+      ctx.beginPath();
+      ctx.moveTo(drawX - 8, drawY - 2);
+      ctx.lineTo(drawX + 12, drawY - 14);
+      ctx.stroke();
+
+      ctx.fillStyle = '#64748B';
+      ctx.beginPath();
+      ctx.arc(drawX + 14, drawY - 16, 5, 0, Math.PI * 2);
+      ctx.fill();
     } else {
+      // INFANTRY CHARACTER SPRITE (Legs, Tunic Body, Head, Helmet)
       ctx.fillStyle = '#1E293B';
       ctx.fillRect(drawX - 6, drawY + 4, 4, 10);
       ctx.fillRect(drawX + 2, drawY + 4, 4, 10);
@@ -642,6 +689,137 @@ export class Canvas2DRenderer {
       ctx.arc(drawX, drawY - 16, 6, Math.PI, Math.PI * 2);
       ctx.fillStyle = isHiddenEnemy ? '#475569' : (isBlue ? '#1E40AF' : '#991B1B');
       ctx.fill();
+
+      // SPECIFIC DETAILED WEAPONS FOR INFANTRY CLASSES
+      ctx.strokeStyle = '#CBD5E1';
+      ctx.lineWidth = 2.0;
+
+      if (cls.includes('SPEAR')) {
+        // Pike/Spear Shaft & Metallic Spearhead Tip
+        ctx.strokeStyle = '#78350F';
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(drawX + 4, drawY + 8);
+        ctx.lineTo(drawX + 14, drawY - 24);
+        ctx.stroke();
+
+        ctx.fillStyle = '#E2E8F0';
+        ctx.beginPath();
+        ctx.moveTo(drawX + 14, drawY - 24);
+        ctx.lineTo(drawX + 12, drawY - 18);
+        ctx.lineTo(drawX + 16, drawY - 18);
+        ctx.closePath();
+        ctx.fill();
+      } else if (cls === 'SWORD_SHIELD') {
+        // Broadsword & Round Iron Shield
+        ctx.fillStyle = '#475569';
+        ctx.strokeStyle = '#1E293B';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(drawX - 8, drawY - 4, 9, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#F59E0B';
+        ctx.beginPath();
+        ctx.arc(drawX - 8, drawY - 4, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#E2E8F0';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(drawX + 6, drawY + 4);
+        ctx.lineTo(drawX + 14, drawY - 14);
+        ctx.stroke();
+      } else if (cls === 'GREATSWORD') {
+        // Massive Two-Handed Greatsword
+        ctx.strokeStyle = '#94A3B8';
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.moveTo(drawX + 4, drawY + 8);
+        ctx.lineTo(drawX + 12, drawY - 24);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#F59E0B';
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        ctx.moveTo(drawX + 6, drawY - 4);
+        ctx.lineTo(drawX + 14, drawY - 8);
+        ctx.stroke();
+      } else if (cls.includes('CROSSBOW')) {
+        // HD Pistol-Grip Wooden Crossbow & Steel Bow Limbs
+        const isHeavy = cls === 'HEAVY_CROSSBOW';
+        const cx = drawX + 4;
+        const cy = drawY - 6;
+
+        ctx.fillStyle = '#78350F';
+        ctx.strokeStyle = '#451A03';
+        ctx.lineWidth = 1.0;
+        ctx.beginPath();
+        ctx.moveTo(cx - 12, cy + 8);
+        ctx.quadraticCurveTo(cx - 8, cy, cx - 2, cy - 2);
+        ctx.lineTo(cx + 8, cy - 2);
+        ctx.lineTo(cx + 10, cy + 3);
+        ctx.lineTo(cx - 2, cy + 3);
+        ctx.quadraticCurveTo(cx - 6, cy + 5, cx - 10, cy + 10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.strokeStyle = '#93C5FD';
+        ctx.lineWidth = isHeavy ? 3.5 : 2.5;
+        ctx.beginPath();
+        const frontX = cx + 6;
+        ctx.moveTo(frontX, cy);
+        ctx.quadraticCurveTo(frontX + 5, cy - 8, frontX - 2, cy - 14);
+        ctx.moveTo(frontX, cy);
+        ctx.quadraticCurveTo(frontX + 5, cy + 8, frontX - 2, cy + 14);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#1E293B';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(frontX - 2, cy - 14);
+        ctx.lineTo(cx - 2, cy);
+        ctx.lineTo(frontX - 2, cy + 14);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#CBD5E1';
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        ctx.moveTo(cx - 2, cy);
+        ctx.lineTo(frontX + 6, cy);
+        ctx.stroke();
+      } else if (cls.includes('BOW')) {
+        // Curved Wooden Bow Staff & Nocked Arrow
+        const isLong = cls === 'LONGBOW';
+        const bowRadius = isLong ? 13 : 9;
+        const bx = drawX + 6;
+        const by = drawY - 8;
+
+        ctx.strokeStyle = '#B45309';
+        ctx.lineWidth = isLong ? 3.0 : 2.2;
+        ctx.beginPath();
+        ctx.arc(bx, by, bowRadius, -Math.PI * 0.45, Math.PI * 0.45);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 1.0;
+        ctx.beginPath();
+        ctx.moveTo(bx + bowRadius * Math.cos(-Math.PI * 0.45), by + bowRadius * Math.sin(-Math.PI * 0.45));
+        ctx.lineTo(bx + bowRadius * Math.cos(Math.PI * 0.45), by + bowRadius * Math.sin(Math.PI * 0.45));
+        ctx.stroke();
+
+        ctx.strokeStyle = '#D97706';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(bx - 6, by);
+        ctx.lineTo(bx + bowRadius + 4, by);
+        ctx.stroke();
+
+        ctx.fillStyle = '#78350F';
+        ctx.fillRect(drawX - 8, drawY - 14, 4, 12);
+      }
     }
     ctx.restore();
 
