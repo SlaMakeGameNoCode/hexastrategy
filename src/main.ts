@@ -718,7 +718,17 @@ window.addEventListener('DOMContentLoaded', () => {
               renderer.getVFXManager().spawnExplosion(cavPos.x, cavPos.y, '#F59E0B', 30);
               renderer.triggerScreenShake(14, 400);
             } else if (targetUnit && targetUnit.id !== u.id) {
-              const skillRes = SkillResolver.executeSkill(attackerClass, sType, u.position, action.targetHex, ArmyRegistry.getStats((targetUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId).defense);
+              const defenderClass = (targetUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId;
+              const skillRes = SkillResolver.executeSkill(
+                attackerClass,
+                sType,
+                u.position,
+                action.targetHex,
+                defenderClass,
+                attackerTerrain,
+                defenderTerrain,
+                isAmbush
+              );
               targetUnit.hp = Math.max(0, targetUnit.hp - skillRes.primaryDamage);
               const pos = HexMath.hexToPixel(targetUnit.position, renderer.getHexRadius());
               floatingTexts.push({ x: pos.x, y: pos.y - 30, text: `-${skillRes.primaryDamage} CHARGE!`, color: '#EF4444', alpha: 1.0 });
@@ -745,13 +755,20 @@ window.addEventListener('DOMContentLoaded', () => {
               await new Promise((r) => setTimeout(r, 16));
             }
 
-            const skillRes = SkillResolver.executeSkill(attackerClass, sType, u.position, action.targetHex || u.position, targetUnit ? ArmyRegistry.getStats((targetUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId).defense : 20);
+            const defenderClass = targetUnit ? (targetUnit.armyClass as ArmyClassId) : undefined;
+            const skillRes = SkillResolver.executeSkill(
+              attackerClass,
+              sType,
+              u.position,
+              action.targetHex || u.position,
+              defenderClass,
+              attackerTerrain,
+              defenderTerrain,
+              isAmbush
+            );
 
             if (targetUnit && targetUnit.id !== u.id) {
-              let bonusDmg = skillRes.primaryDamage;
-              if (sType === 'FIRE_ARROW' && defenderTerrain === 'FOREST') {
-                bonusDmg = Math.round(bonusDmg * 1.50);
-              }
+              const bonusDmg = skillRes.primaryDamage;
 
               targetUnit.hp = Math.max(0, targetUnit.hp - bonusDmg);
               const pos = HexMath.hexToPixel(targetUnit.position, renderer.getHexRadius());
