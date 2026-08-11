@@ -46,6 +46,9 @@ window.addEventListener('DOMContentLoaded', () => {
   let opponentPvpColor = '#EF4444';
   let pvpMyActionsSubmitted = false;
   let pvpOpponentActionsBuffer: Array<{ unitId: string; action: object }> | null = null;
+  let pvpBattleReadyMe = false;
+  let pvpBattleReadyOpponent = false;
+  let pvpBattleAutoTimer: ReturnType<typeof setTimeout> | null = null;
 
   AuthService.onProfileChanged((profile: UserProfile | null) => {
     if (profile) {
@@ -161,14 +164,31 @@ window.addEventListener('DOMContentLoaded', () => {
     const surrenderBtn = document.getElementById('btn-surrender');
     if (surrenderBtn) surrenderBtn.style.display = 'flex';
 
+    // FIX BUG-0001: Flip canvas 180° for Player 2 (Red) so their units appear at bottom
+    if (assignedColor === '#EF4444') {
+      canvas.style.transform = 'rotate(180deg)';
+      canvas.style.transformOrigin = 'center center';
+    } else {
+      canvas.style.transform = '';
+    }
+
+    // Reset battle-ready flags for new match
+    pvpBattleReadyMe = false;
+    pvpBattleReadyOpponent = false;
+    if (pvpBattleAutoTimer) { clearTimeout(pvpBattleAutoTimer); pvpBattleAutoTimer = null; }
+
     floatingTexts.push({ x: 0, y: -40, text: `⚔️ PVP! BẠN CHỈ HUY ${assignedColor === '#3B82F6' ? 'QUÂN XANH 🔵' : 'QUÂN ĐỎ 🔴'}`, color: '#10B981', alpha: 1.0 });
   });
 
-  // Receive opponent's planned actions → apply them then resolve together
+  // Receive opponent's planned actions OR battle-start signal
   lobbyManager.onGameAction((msg) => {
     if (msg.kind === 'TEAM_ACTIONS' && msg.actions) {
       pvpOpponentActionsBuffer = msg.actions as Array<{ unitId: string; action: object }>;
       pvpTryResolve();
+    } else if (msg.kind === 'BATTLE_START') {
+      // FIX BUG-0002: Opponent clicked "Bắt Đầu" — try to start battle
+      pvpBattleReadyOpponent = true;
+      pvpTryStartBattle();
     }
   });
 
@@ -682,6 +702,91 @@ window.addEventListener('DOMContentLoaded', () => {
     if (apFill) apFill.style.width = `${(remaining / 10) * 100}%`;
   }
 
+  // FIX BUG-0002: Extract battle-start logic into a shared function
+  function actuallyStartBattle(): void {
+    if (pvpBattleAutoTimer) { clearTimeout(pvpBattleAutoTimer); pvpBattleAutoTimer = null; }
+    showPvpWaiting(false);
+
+    const matchupModal = document.getElementById('matchup-modal');
+    const playerApEl = document.getElementById('matchup-player-ap');
+    const enemyApEl = document.getElementById('matchup-enemy-ap');
+    const playerListEl = document.getElementById('matchup-player-list');
+    const enemyListEl = document.getElementById('matchup-enemy-list');
+    const bannerEl = document.getElementById('matchup-initiative-banner');
+    const countdownEl = document.getElementById('matchup-countdown');
+
+    const playerTotalAP = calculateSquadTotalAP('#3B82F6');
+    const enemyTotalAP = calculateSquadTotalAP('#EF4444');
+
+    if (playerTotalAP <= enemyTotalAP) {
+      firstTurnOwnerColor = '#3B82F6';
+      if (bannerEl) {
+        bannerEl.innerText = `👑 ĐỘI XANH (${playerTotalAP} AP) NHẸ HƠN ĐỘI ĐỎ (${enemyTotalAP} AP) -> XANH ĐI TRƯỚC!`;
+        bannerEl.style.borderColor = '#3B82F6';
+        bannerEl.style.color = '#60A5FA';
+      }
+    } else {
+      firstTurnOwnerColor = '#EF4444';
+      if (bannerEl) {
+        bannerEl.innerText = `⚡ ĐỘI ĐỎ (${enemyTotalAP} AP) NHẸ HƠN ĐỘI XANH (${playerTotalAP} AP) -> ĐỎ ĐI TRƯỚC!`;
+        bannerEl.style.borderColor = '#EF4444';
+        bannerEl.style.color = '#F87171';
+      }
+    }
+
+    if (playerApEl) playerApEl.innerText = `Tổng AP: ${playerTotalAP}`;
+    if (enemyApEl) enemyApEl.innerText = `Tổng AP: ${enemyTotalAP}`;
+
+    if (playerListEl) {
+      playerListEl.innerHTML = units
+        .filter(u => u.ownerColor === '#3B82F6')
+        .map(u => {
+          const stats = ArmyRegistry.getStats(u.armyClass as ArmyClassId);
+          return `<div style="display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 8px;"><span>${u.name}</span><span style="color: #F59E0B;">${stats.actionCost} AP</span></div>`;
+        }).join('');
+    }
+    if (enemyListEl) {
+      enemyListEl.innerHTML = units
+        .filter(u => u.ownerColor === '#EF4444')
+        .map(u => {
+          const stats = ArmyRegistry.getStats(u.armyClass as ArmyClassId);
+          return `<div style="display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 8px;"><span>${u.name}</span><span style="color: #F59E0B;">${stats.actionCost} AP</span></div>`;
+        }).join('');
+    }
+
+    if (matchupModal) matchupModal.style.display = 'flex';
+    let countdown = 3;
+    if (countdownEl) countdownEl.innerText = '3';
+
+    const timerInterval = setInterval(() => {
+      countdown--;
+      if (countdownEl) countdownEl.innerText = countdown.toString();
+      if (countdown <= 0) {
+        clearInterval(timerInterval);
+        if (matchupModal) matchupModal.style.display = 'none';
+        turnManager.setPhase('PLANNING');
+        const deckDrawer = document.getElementById('deck-drawer');
+        const globalTurnContainer = document.getElementById('global-turn-container');
+        const phaseTitle2 = document.getElementById('phase-title');
+        if (deckDrawer) deckDrawer.style.display = 'none';
+        if (globalTurnContainer) globalTurnContainer.style.display = 'flex';
+        if (phaseTitle2) phaseTitle2.innerText = `Round 1 - Lập Kế Hoạch (${firstTurnOwnerColor === '#3B82F6' ? 'Xanh đi trước' : 'Đỏ đi trước'})`;
+        selectUnit(null);
+        startPlanningTimer();
+      }
+    }, 1000);
+  }
+
+  // FIX BUG-0002: Try to start battle when both players ready (or auto after 30s)
+  function pvpTryStartBattle(): void {
+    if (pvpBattleReadyMe && pvpBattleReadyOpponent) {
+      actuallyStartBattle();
+    } else if (pvpBattleReadyMe) {
+      // Show waiting overlay — opponent hasn't clicked yet
+      showPvpWaiting(true);
+    }
+  }
+
   // PvP: show/hide waiting overlay
   function showPvpWaiting(show: boolean): void {
     const overlay = document.getElementById('pvp-waiting-overlay');
@@ -1166,8 +1271,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function getCanvasHex(evt: MouseEvent): HexCoord {
     const rect = canvas.getBoundingClientRect();
-    const px = (evt.clientX - rect.left - rect.width / 2);
-    const py = (evt.clientY - rect.top - (rect.height / 2 - 40));
+    let px = (evt.clientX - rect.left - rect.width / 2);
+    let py = (evt.clientY - rect.top - (rect.height / 2 - 40));
+    // FIX BUG-0001: Player 2 canvas is rotated 180° — invert click coords to match
+    if (pvpMode && myPvpColor === '#EF4444') {
+      px = -px;
+      py = -py;
+    }
     return HexMath.pixelToHex({ x: px, y: py }, renderer.getHexRadius());
   }
 
@@ -1332,80 +1442,22 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('btn-start-battle')?.addEventListener('click', () => {
-    const matchupModal = document.getElementById('matchup-modal');
-    const playerApEl = document.getElementById('matchup-player-ap');
-    const enemyApEl = document.getElementById('matchup-enemy-ap');
-    const playerListEl = document.getElementById('matchup-player-list');
-    const enemyListEl = document.getElementById('matchup-enemy-list');
-    const bannerEl = document.getElementById('matchup-initiative-banner');
-    const countdownEl = document.getElementById('matchup-countdown');
-
-    const playerTotalAP = calculateSquadTotalAP('#3B82F6');
-    const enemyTotalAP = calculateSquadTotalAP('#EF4444');
-
-    if (playerTotalAP <= enemyTotalAP) {
-      firstTurnOwnerColor = '#3B82F6';
-      if (bannerEl) {
-        bannerEl.innerText = `👑 ĐỘI TA (Total AP: ${playerTotalAP}) NHẸ HƠN ĐỊCH (${enemyTotalAP} AP) -> BẠN ĐƯỢC ĐI TRƯỚC!`;
-        bannerEl.style.borderColor = '#3B82F6';
-        bannerEl.style.color = '#60A5FA';
+    if (pvpMode) {
+      // FIX BUG-0002: In PvP, signal server instead of starting immediately
+      pvpBattleReadyMe = true;
+      lobbyManager.sendGameAction('BATTLE_START', []);
+      pvpTryStartBattle();
+      // Auto-start after 30 seconds even if opponent hasn't clicked
+      if (!pvpBattleAutoTimer) {
+        pvpBattleAutoTimer = setTimeout(() => {
+          pvpBattleReadyOpponent = true;
+          pvpTryStartBattle();
+        }, 30000);
       }
-    } else {
-      firstTurnOwnerColor = '#EF4444';
-      if (bannerEl) {
-        bannerEl.innerText = `⚡ ĐỘI ĐỊCH (Total AP: ${enemyTotalAP}) NHẸ HƠN BẠN (${playerTotalAP} AP) -> ĐỊCH ĐƯỢC ĐI TRƯỚC!`;
-        bannerEl.style.borderColor = '#EF4444';
-        bannerEl.style.color = '#F87171';
-      }
+      return;
     }
-
-    if (playerApEl) playerApEl.innerText = `Tổng AP: ${playerTotalAP}`;
-    if (enemyApEl) enemyApEl.innerText = `Tổng AP: ${enemyTotalAP}`;
-
-    if (playerListEl) {
-      playerListEl.innerHTML = units
-        .filter(u => u.ownerColor === '#3B82F6')
-        .map(u => {
-          const stats = ArmyRegistry.getStats(u.armyClass as ArmyClassId);
-          return `<div style="display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 8px;"><span>${u.name}</span><span style="color: #F59E0B;">${stats.actionCost} AP</span></div>`;
-        }).join('');
-    }
-
-    if (enemyListEl) {
-      enemyListEl.innerHTML = units
-        .filter(u => u.ownerColor === '#EF4444')
-        .map(u => {
-          const stats = ArmyRegistry.getStats(u.armyClass as ArmyClassId);
-          return `<div style="display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 8px;"><span>${u.name}</span><span style="color: #F59E0B;">${stats.actionCost} AP</span></div>`;
-        }).join('');
-    }
-
-    if (matchupModal) matchupModal.style.display = 'flex';
-
-    let countdown = 3;
-    if (countdownEl) countdownEl.innerText = '3';
-
-    const timerInterval = setInterval(() => {
-      countdown--;
-      if (countdownEl) countdownEl.innerText = countdown.toString();
-
-      if (countdown <= 0) {
-        clearInterval(timerInterval);
-        if (matchupModal) matchupModal.style.display = 'none';
-
-        turnManager.setPhase('PLANNING');
-        const deckDrawer = document.getElementById('deck-drawer');
-        const globalTurnContainer = document.getElementById('global-turn-container');
-        const phaseTitle = document.getElementById('phase-title');
-
-        if (deckDrawer) deckDrawer.style.display = 'none';
-        if (globalTurnContainer) globalTurnContainer.style.display = 'flex';
-        if (phaseTitle) phaseTitle.innerText = `Round 1 - Lập Kế Hoạch (${firstTurnOwnerColor === '#3B82F6' ? 'Bạn đi trước' : 'Địch đi trước'})`;
-
-        selectUnit(null);
-        startPlanningTimer();
-      }
-    }, 1000);
+    // PvE mode: start immediately
+    actuallyStartBattle();
   });
 
   document.getElementById('btn-next-battle')?.addEventListener('click', () => {
