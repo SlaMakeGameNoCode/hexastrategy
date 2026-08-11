@@ -502,7 +502,9 @@ export class Canvas2DRenderer {
       this.ctx.stroke();
       this.ctx.setLineDash([]);
 
-      const destPos = HexMath.hexToPixel(pathPreview[pathPreview.length - 1], this.hexRadius);
+      const destHex = pathPreview[pathPreview.length - 1];
+      const destCoord = isFlipped ? { q: -destHex.q, r: -destHex.r } : destHex;
+      const destPos = HexMath.hexToPixel(destCoord, this.hexRadius);
       this.drawHexagon(this.ctx, centerX + destPos.x, centerY + destPos.y, this.hexRadius - 2, 'rgba(245, 158, 11, 0.4)', '#F59E0B');
     }
 

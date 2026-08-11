@@ -175,13 +175,20 @@ window.addEventListener('DOMContentLoaded', () => {
     floatingTexts.push({ x: 0, y: -40, text: `⚔️ PVP! BẠN CHỈ HUY ${assignedColor === '#3B82F6' ? 'QUÂN XANH 🔵' : 'QUÂN ĐỎ 🔴'}`, color: '#10B981', alpha: 1.0 });
   });
 
-  // Receive opponent's planned actions OR battle-start signal
-  lobbyManager.onGameAction((msg) => {
-    if (msg.kind === 'TEAM_ACTIONS' && msg.actions) {
-      pvpOpponentActionsBuffer = msg.actions as Array<{ unitId: string; action: object }>;
-      pvpTryResolve();
+  // Receive opponent's turn action in Realtime
+  lobbyManager.onGameAction(async (msg) => {
+    if (msg.kind === 'SINGLE_TURN_ACTION' && msg.actions) {
+      // Apply opponent's turn action immediately
+      for (const { unitId, action } of msg.actions) {
+        const unit = units.find(u => u.id === unitId);
+        if (unit) {
+          unit.assignedAction = action as any;
+          unit.hasActedThisRound = true;
+        }
+      }
+      // Execute animation phase for opponent's turn immediately on both screens!
+      await resolveRoundPhase();
     } else if (msg.kind === 'BATTLE_START') {
-      // Opponent clicked "Bắt Đầu" — try to start battle
       pvpBattleReadyOpponent = true;
       if (pvpBattleReadyMe) {
         showPvpWaiting(false);
@@ -774,35 +781,17 @@ window.addEventListener('DOMContentLoaded', () => {
     if (overlay) overlay.style.display = show ? 'flex' : 'none';
   }
 
-  // PvP: try to resolve when BOTH players have submitted their actions
-  function pvpTryResolve(): void {
-    if (!pvpMyActionsSubmitted) return;
-    if (!pvpOpponentActionsBuffer) {
-      // FIX STORY-005: Do NOT show waiting modal inside battle! Keep playing interface clean
-      return;
-    }
-    // Apply opponent's planned actions to their units
-    for (const { unitId, action } of pvpOpponentActionsBuffer) {
-      const unit = units.find(u => u.id === unitId);
-      if (unit) {
-        unit.assignedAction = action as any;
-        unit.hasActedThisRound = true;
-      }
-    }
-    pvpOpponentActionsBuffer = null;
-    pvpMyActionsSubmitted = false;
-    showPvpWaiting(false);
-    resolveRoundPhase();
-  }
-
-  // PvP: collect own planned actions, send to server, wait for opponent
-  function pvpSubmitTurn(): void {
+  // PvP: submit single turn action in Realtime, run animation immediately & switch turn
+  async function pvpSubmitTurn(): Promise<void> {
     const myActions = units
       .filter(u => u.ownerColor === myPvpColor && u.assignedAction && u.hasActedThisRound)
       .map(u => ({ unitId: u.id, action: { ...u.assignedAction } }));
-    lobbyManager.sendGameAction('TEAM_ACTIONS', myActions);
-    pvpMyActionsSubmitted = true;
-    pvpTryResolve();
+    
+    // Relay turn action to opponent immediately
+    lobbyManager.sendGameAction('SINGLE_TURN_ACTION', myActions);
+    
+    // Run animation phase for my turn immediately
+    await resolveRoundPhase();
   }
 
   function startPlanningTimer() {
