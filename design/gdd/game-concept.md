@@ -72,16 +72,12 @@ The long-term loop is:
 
 ## Detailed Rules
 
-### Turn Model: Simultaneous Planning
-Both players receive **10 seconds** to submit actions.  
-Each player has **10 Action Points (AP) per round**.  
-Every army has an individual **Action Cost**. Activating an army for its primary action consumes that Action Cost from the player's 10 AP budget.
-
-$$\text{Total Action Cost of Active Armies} \le 10 \text{ AP}$$
-
-- Each army normally performs at most **one primary action per round**.
-- When timer expires, the server resolves all actions according to initiative, reactions, and combat rules.
-- Unused AP resets to 10 at the start of each round (no carryover).
+### Turn Model: Alternating Realtime Turn (Mô Hình Cờ Vua / Cờ Tướng Luân Phiên)
+Trận đấu diễn ra theo lượt luân phiên từng người chơi:
+- **Lượt Đi (Turn)**: Mỗi người chơi có 15 giây để chọn 1 lính di chuyển hoặc kích hoạt kỹ năng.
+- **Realtime Animation Relay**: Ngay khi gửi lượt đi, hành động và hoạt cảnh (chém/nổ/bắn tên) được truyền qua WebSocket và **chạy hoạt cảnh đồng thời trên cả 2 màn hình tại thời điểm đó**.
+- **Đồng Bộ Góc Nhìn Đối Ứng 180°**: Người chơi 1 và Người chơi 2 đều thấy quân mình ở phía dưới màn hình. Player 2 được lật đối ứng `(q, r) -> (-q, -r)`.
+- **Hệ Thống Reconnect & Heartbeat**: Heartbeat 5s Ping-Pong giữ kết nối sống 100%. Nếu rớt mạng quá 30s sẽ bị xử thua rớt mạng (`Forfeit Win`).
 
 ### Game Modes
 1. **PvP Matchmaking**: Ranked 1v1 based on skill MMR.

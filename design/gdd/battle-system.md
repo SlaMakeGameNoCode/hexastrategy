@@ -8,7 +8,21 @@
 
 ## Overview
 
-The Battle System defines short-form, turn-based tactical combat played on a hexagonal grid. Players bring up to 5 armies into a 1v1 battle (PvP Matchmaking, PvP Private, or PvE vs AI). Each round utilizes Simultaneous Planning with a 10-second timer and a 10 Action Point (AP) budget. The server is authoritative for state validation and turn resolution.
+The Battle System defines short-form, turn-based tactical combat played on a hexagonal grid. Players bring up to 8 armies into a 1v1 battle (PvP Matchmaking, PvP Private, or PvE vs AI). 
+
+### Key Rules Update (v1.0 - Alternating Realtime Turn Model):
+1. **Alternating Turn-Based Model (Mô hình Cờ Vua / Cờ Tướng Luân Phiên Realtime)**:
+   - Thay vì lập kế hoạch đồng thời (Simultaneous), trận đấu diễn ra theo lượt luân phiên từng người chơi.
+   - **Lượt Người Chơi A**: A chọn lính di chuyển / dùng kỹ năng -> Bấm "Gửi Lượt" (hoặc hết 15s đếm lùi). Hành động lập tức truyền qua WebSocket `SINGLE_TURN_ACTION` và **CẢ HÀI MÁY CÙNG PHÁT ANIMATION / VFX REALTIME** tại thời điểm đó.
+   - Sau khi lượt A xong, bàn cờ chuyển sang **Lượt Người Chơi B**. B nhìn thấy rõ vị trí lính A đã di chuyển tới để tính toán phản công mà không phải đoán mò.
+2. **Perspective Flipping (Góc nhìn lật đối ứng 180°)**:
+   - Cả 2 người chơi đều có góc nhìn **"Quân Ta"** nằm ở nửa dưới màn hình.
+   - Với Player 2 (Đỏ), tọa độ bàn cờ và dàn quân được lật đối ứng theo công thức `(q, r) -> (-q, -r)`. Hình ảnh đồ họa lính và văn bản giữ nguyên chiều đứng.
+   - **Toàn bộ ma trận tọa độ, ô xem trước đường đi, chữ số sát thương bay lên `-20` và hiệu ứng nổ VFX đều được đồng bộ lật theo `isFlipped`**.
+3. **Modal UI & Disconnect Grace Period**:
+   - **Modal `⏳ ĐANG CHỜ ĐỐI THỦ...`**: KHÔNG BAO GIỜ hiển thị bên trong trận đấu.
+   - **Heartbeat 5s Ping-Pong**: Giữ kết nối WebSocket sống 100%, chống bị ngắt kết nối ngầm.
+   - **30s Disconnect Grace Period**: Nếu 1 bên bị rớt mạng, bên còn lại nhận thông báo đếm ngược 30s. Nếu rớt mạng quá 30s sẽ bị xử thua rớt mạng (`Forfeit Win`).
 
 ---
 
