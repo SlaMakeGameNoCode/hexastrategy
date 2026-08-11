@@ -105,19 +105,29 @@ wss.on('connection', (ws) => {
                 mapSeed
               });
 
-              const matchMsg = JSON.stringify({
+              // IMPORTANT: Send DIFFERENT yourColor to each player
+              const msgForChallenger = JSON.stringify({
                 type: 'MATCH_START',
                 roomId,
-                fromUid: data.toUid,   // player1 = challenger (blue)
+                yourColor: '#3B82F6',   // Challenger = Blue
+                opponentColor: '#EF4444',
+                firstTurnColor: '#3B82F6',
+                mapSeed
+              });
+              const msgForAccepter = JSON.stringify({
+                type: 'MATCH_START',
+                roomId,
+                yourColor: '#EF4444',   // Accepter = Red
+                opponentColor: '#3B82F6',
                 firstTurnColor: '#3B82F6',
                 mapSeed
               });
 
               if (challengerClient.ws.readyState === WebSocket.OPEN) {
-                challengerClient.ws.send(matchMsg);
+                challengerClient.ws.send(msgForChallenger);
               }
               if (ws.readyState === WebSocket.OPEN) {
-                ws.send(matchMsg);
+                ws.send(msgForAccepter);
               }
             } else {
               if (challengerClient.ws.readyState === WebSocket.OPEN) {

@@ -18,6 +18,8 @@ export interface ChallengeMessage {
   users?: OnlineUser[];
   firstTurnColor?: string;
   mapSeed?: number;
+  yourColor?: string;       // Server directly tells this player their color
+  opponentColor?: string;
   // For GAME_ACTION
   kind?: string;
   actions?: Array<{ unitId: string; action: object }>;
@@ -103,10 +105,11 @@ export class LobbyManager {
       case 'MATCH_START':
         if (msg.roomId && this.onMatchStartCallback) {
           this.currentRoomId = msg.roomId;
-          // player1 (fromUid) = Blue, player2 (accepter) = Red
-          const assignedColor = msg.fromUid === this.currentUser?.uid ? '#3B82F6' : '#EF4444';
+          // Server now explicitly sends yourColor to each player - no UID comparison needed!
+          const assignedColor = msg.yourColor || '#3B82F6';
           const firstColor = msg.firstTurnColor || '#3B82F6';
           const seed = msg.mapSeed || Math.floor(Math.random() * 9000000);
+          console.log(`[PvP] MATCH_START received. Your color: ${assignedColor}, Seed: ${seed}`);
           this.onMatchStartCallback(msg.roomId, assignedColor, firstColor, seed);
         }
         break;
