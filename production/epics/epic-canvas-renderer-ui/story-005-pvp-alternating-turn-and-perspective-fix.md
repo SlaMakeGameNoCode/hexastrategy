@@ -1,7 +1,7 @@
 # Story 005: Alternating PvP Turn Flow & Inverted Click Matrix Fix
 
 > **Epic**: Canvas 2D Renderer & Game UI  
-> **Status**: In Progress  
+> **Status**: Complete  
 > **Layer**: Gameplay / UI  
 > **Type**: Logic  
 > **Estimate**: 2 hours  
@@ -24,9 +24,9 @@
 
 ## Acceptance Criteria
 
-- [ ] **AC-1**: Modal `⏳ ĐANG CHỜ ĐỐI THỦ...` KHÔNG BAO GIỜ hiển thị bên trong trận đấu.
-- [ ] **AC-2**: Banner trạng thái lượt hiển thị chính xác `🟢 LƯỢT CỦA BẠN (15s)` khi đến lượt ta và `🔴 LƯỢT ĐỐI THỦ (15s)` khi đến lượt đối phương. Nút `"Kết Thúc Lượt"` bị làm mờ (Disabled) khi không phải lượt của mình.
-- [ ] **AC-3**: Sửa triệt để lỗi click chuột lệch ô cho Player 2 (`myPvpColor === '#EF4444'`). Tọa độ `getCanvasHex` đảo chính xác 1 lần `(-q, -r)` để chọn chuẩn 100% quân lính ở nửa dưới màn hình.
+- [x] **AC-1**: Modal `⏳ ĐANG CHỜ ĐỐI THỦ...` KHÔNG BAO GIỜ hiển thị bên trong trận đấu.
+- [x] **AC-2**: Banner trạng thái lượt hiển thị chính xác `🟢 LƯỢT CỦA BẠN (15s)` khi đến lượt ta và `🔴 LƯỢT ĐỐI THỦ (15s)` khi đến lượt đối phương. Nút `"Kết Thúc Lượt"` bị làm mờ (Disabled) khi không phải lượt của mình.
+- [x] **AC-3**: Sửa triệt để lỗi click chuột lệch ô cho Player 2 (`myPvpColor === '#EF4444'`). Tọa độ `getCanvasHex` đảo chính xác 1 lần `(-q, -r)` để chọn chuẩn 100% quân lính ở nửa dưới màn hình.
 
 ---
 
