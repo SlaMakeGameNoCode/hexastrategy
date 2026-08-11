@@ -4,3 +4,5 @@ services:
     env: node
     buildCommand: npm run build
     startCommand: npm start
+    autoDeploy: true
+
