@@ -75,9 +75,14 @@ export class LobbyManager {
     };
 
     this.ws.onclose = () => {
+      console.log('WebSocket closed, attempting reconnect in 3s...');
       setTimeout(() => {
         if (this.currentUser) this.connect(this.currentUser);
       }, 3000);
+    };
+
+    this.ws.onerror = (err) => {
+      console.error('WebSocket error:', err);
     };
   }
 
@@ -129,7 +134,12 @@ export class LobbyManager {
   }
 
   public sendChallenge(targetUid: string): void {
-    if (!this.ws || !this.currentUser) return;
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      alert('⚠️ Đã mất kết nối WebSocket tới Server. Đang tự động kết nối lại...');
+      if (this.currentUser) this.connect(this.currentUser);
+      return;
+    }
+    if (!this.currentUser) return;
     this.ws.send(JSON.stringify({
       type: 'SEND_CHALLENGE',
       fromUid: this.currentUser.uid,
