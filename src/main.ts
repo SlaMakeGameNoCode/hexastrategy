@@ -89,7 +89,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     const counterMap: Record<string, string> = {
       SHORT_SPEAR: '🗡️ Gây 150% DMG kỵ nhẹ. Khắc chế kỵ binh xé rào.',
-      LONG_SPEAR: '🔱 Thủ giáo (Brace) phản 200% DMG khi Kỵ binh xông vào.',
+      LONG_SPEAR: '🔱 Trận địa phản công 200% DMG khi Kỵ binh xông vào.',
       SWORD_SHIELD: '🛡️ Phòng thủ cao, giảm 25% DMG nhận từ cung thủ.',
       GREATSWORD: '⚔️ Sát thương cận chiến cực đại, xé rách hàng rào giáp.',
       LIGHT_CAVALRY: '🏇 Tốc độ 4 MP, khắc chế Cung thủ và Khí tài công thành.',
@@ -157,7 +157,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function updateActionButtonsUI(unit: RenderableUnit | null) {
     const btnSkill = document.getElementById('btn-skill');
-    const btnBrace = document.getElementById('btn-brace');
 
     if (unit && unit.ownerColor === '#3B82F6') {
       const armyClass = (unit.armyClass || 'SHORT_SPEAR') as ArmyClassId;
@@ -165,6 +164,7 @@ window.addEventListener('DOMContentLoaded', () => {
       const skillDef = SkillResolver.getSkillDefinition(skillType);
 
       if (btnSkill) {
+        // IF UNIT HAS ALREADY ASSIGNED AN ACTION -> Show Cancel Action Option!
         if (unit.hasActedThisRound && unit.assignedAction) {
           const actName = unit.assignedAction.type === 'SKILL' ? skillDef.name : unit.assignedAction.type;
           btnSkill.innerText = `✖️ Hủy Lệnh ${actName} (Hoàn +${unit.assignedAction.cost} AP)`;
@@ -178,21 +178,12 @@ window.addEventListener('DOMContentLoaded', () => {
             : 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.3) 100%)';
         }
       }
-
-      if (btnBrace) {
-        if (!unit.hasActedThisRound && (armyClass === 'SHORT_SPEAR' || armyClass === 'LONG_SPEAR')) {
-          btnBrace.style.display = 'flex';
-        } else {
-          btnBrace.style.display = 'none';
-        }
-      }
     } else {
       if (btnSkill) {
         btnSkill.innerText = '🔥 Kỹ Năng Đặc Biệt';
         btnSkill.style.display = 'flex';
         btnSkill.style.background = 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.3) 100%)';
       }
-      if (btnBrace) btnBrace.style.display = 'none';
     }
   }
 
@@ -859,17 +850,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('btn-end-turn')?.addEventListener('click', () => {
     resolveRoundPhase();
-  });
-
-  document.getElementById('btn-brace')?.addEventListener('click', () => {
-    if (selectedUnit && selectedUnit.ownerColor === '#3B82F6' && !selectedUnit.hasActedThisRound && turnManager.getPhase() === 'PLANNING') {
-      if (hud.getAPRemaining() >= 2) {
-        selectedUnit.assignedAction = { type: 'BRACE', cost: 2 };
-        selectedUnit.hasActedThisRound = true;
-        selectUnit(selectedUnit);
-        updateAPBudget();
-      }
-    }
   });
 
   // 60 FPS Render Loop
