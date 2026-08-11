@@ -158,15 +158,23 @@ window.addEventListener('DOMContentLoaded', () => {
       const skillDef = SkillResolver.getSkillDefinition(skillType);
 
       if (btnSkill) {
-        btnSkill.innerText = `${isTargetingSkillMode ? '🎯 Click Địch / Ô Bắn (Hủy ✖️)' : skillDef.name + ' (' + skillDef.apCost + ' AP)'}`;
-        btnSkill.style.display = 'flex';
-        btnSkill.style.background = isTargetingSkillMode
-          ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(220, 38, 38, 0.6) 100%)'
-          : 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.3) 100%)';
+        // IF UNIT HAS ALREADY ASSIGNED AN ACTION -> Show Cancel Action Option!
+        if (unit.hasActedThisRound && unit.assignedAction) {
+          const actName = unit.assignedAction.type === 'SKILL' ? skillDef.name : unit.assignedAction.type;
+          btnSkill.innerText = `✖️ Hủy Lệnh ${actName} (Hoàn +${unit.assignedAction.cost} AP)`;
+          btnSkill.style.display = 'flex';
+          btnSkill.style.background = 'linear-gradient(135deg, rgba(239, 68, 68, 0.5) 0%, rgba(185, 28, 28, 0.7) 100%)';
+        } else {
+          btnSkill.innerText = `${isTargetingSkillMode ? '🎯 Click Địch / Ô Bắn (Hủy ✖️)' : skillDef.name + ' (' + skillDef.apCost + ' AP)'}`;
+          btnSkill.style.display = 'flex';
+          btnSkill.style.background = isTargetingSkillMode
+            ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(220, 38, 38, 0.6) 100%)'
+            : 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.3) 100%)';
+        }
       }
 
       if (btnBrace) {
-        if (armyClass === 'SHORT_SPEAR' || armyClass === 'LONG_SPEAR') {
+        if (!unit.hasActedThisRound && (armyClass === 'SHORT_SPEAR' || armyClass === 'LONG_SPEAR')) {
           btnBrace.style.display = 'flex';
         } else {
           btnBrace.style.display = 'none';
@@ -190,7 +198,7 @@ window.addEventListener('DOMContentLoaded', () => {
       updateActionButtonsUI(null);
       return;
     }
-    if (unit && (unit.ownerColor !== '#3B82F6' || unit.hasActedThisRound)) return;
+    if (unit && unit.ownerColor !== '#3B82F6') return;
 
     selectedUnit = unit;
     updateTileOccupancy();
@@ -201,12 +209,16 @@ window.addEventListener('DOMContentLoaded', () => {
       const stats = ArmyRegistry.getStats(armyClassId);
       updateInspectorPanel(armyClassId);
 
-      pathOverlay.selectUnit(
-        unit.position,
-        unit.category,
-        stats.movementPoints,
-        getTileForPathfinding
-      );
+      if (!unit.hasActedThisRound) {
+        pathOverlay.selectUnit(
+          unit.position,
+          unit.category,
+          stats.movementPoints,
+          getTileForPathfinding
+        );
+      } else {
+        pathOverlay.clearSelection();
+      }
     } else {
       pathOverlay.clearSelection();
     }
@@ -621,14 +633,10 @@ window.addEventListener('DOMContentLoaded', () => {
       (u) => u.hp > 0 && u.position.q === clickedHex.q && u.position.r === clickedHex.r
     );
 
-    // 1. CLICK ON ANY PLAYER UNIT -> Always cancel targeting mode and select that unit!
+    // 1. CLICK ON ANY PLAYER UNIT -> Select unit (whether acted or unacted!)
     if (clickedUnit && clickedUnit.ownerColor === '#3B82F6') {
       isTargetingSkillMode = false;
-      if (!clickedUnit.hasActedThisRound) {
-        selectUnit(clickedUnit);
-      } else {
-        selectUnit(null);
-      }
+      selectUnit(clickedUnit);
       return;
     }
 
@@ -698,9 +706,19 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // UI Skill Button Event Listener: Toggle Targeting Mode or Instant Self-Buff
+  // UI Skill Button Event Listener: Assign Skill OR Cancel Assigned Skill (Undo)!
   document.getElementById('btn-skill')?.addEventListener('click', () => {
-    if (selectedUnit && selectedUnit.ownerColor === '#3B82F6' && !selectedUnit.hasActedThisRound && turnManager.getPhase() === 'PLANNING') {
+    if (selectedUnit && selectedUnit.ownerColor === '#3B82F6' && turnManager.getPhase() === 'PLANNING') {
+      // IF UNIT HAS ALREADY ASSIGNED AN ACTION -> CANCEL / UNDO IT!
+      if (selectedUnit.hasActedThisRound) {
+        delete selectedUnit.assignedAction;
+        selectedUnit.hasActedThisRound = false;
+        selectUnit(selectedUnit);
+        updateAPBudget();
+        return;
+      }
+
+      // ASSIGN NEW SKILL
       const armyClass = (selectedUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId;
       const skillType = SkillResolver.getSkillForClass(armyClass);
       const skillDef = SkillResolver.getSkillDefinition(skillType);
@@ -714,10 +732,9 @@ window.addEventListener('DOMContentLoaded', () => {
             cost: skillDef.apCost
           };
           selectedUnit.hasActedThisRound = true;
-          selectUnit(null);
+          selectUnit(selectedUnit);
           updateAPBudget();
         } else {
-          // TOGGLE targeting mode: if already targeting, cancel it!
           isTargetingSkillMode = !isTargetingSkillMode;
           updateActionButtonsUI(selectedUnit);
         }
@@ -825,7 +842,7 @@ window.addEventListener('DOMContentLoaded', () => {
       if (hud.getAPRemaining() >= 2) {
         selectedUnit.assignedAction = { type: 'BRACE', cost: 2 };
         selectedUnit.hasActedThisRound = true;
-        selectUnit(null);
+        selectUnit(selectedUnit);
         updateAPBudget();
       }
     }
