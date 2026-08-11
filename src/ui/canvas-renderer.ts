@@ -106,7 +106,7 @@ export class Canvas2DRenderer {
     }
   }
 
-  public cacheTerrain(tiles: MapTileRenderData[]): void {
+  public cacheTerrain(tiles: MapTileRenderData[], isFlipped?: boolean): void {
     const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
     const width = this.logicalWidth;
     const height = this.logicalHeight;
@@ -123,7 +123,8 @@ export class Canvas2DRenderer {
     offCtx.clearRect(0, 0, width, height);
 
     for (const tile of tiles) {
-      const pos = HexMath.hexToPixel(tile.coord, this.hexRadius);
+      const coord = isFlipped ? { q: -tile.coord.q, r: -tile.coord.r } : tile.coord;
+      const pos = HexMath.hexToPixel(coord, this.hexRadius);
       const cx = centerX + pos.x;
       const cy = centerY + pos.y;
 
@@ -418,7 +419,8 @@ export class Canvas2DRenderer {
     floatingTexts?: FloatingText[],
     deployZoneHexes?: HexCoord[],
     visibleHexes?: Set<string>,
-    isDeploymentPhase?: boolean
+    isDeploymentPhase?: boolean,
+    isFlipped?: boolean
   ): void {
     this.setupDPI();
 
@@ -439,7 +441,7 @@ export class Canvas2DRenderer {
     this.ctx.clearRect(0, 0, width, height);
 
     if (!this.offscreenCanvas) {
-      this.cacheTerrain(tiles);
+      this.cacheTerrain(tiles, isFlipped);
     }
     if (this.offscreenCanvas) {
       this.ctx.drawImage(this.offscreenCanvas, shakeX, shakeY, width, height);
@@ -449,7 +451,8 @@ export class Canvas2DRenderer {
       for (const tile of tiles) {
         const hexKey = `${tile.coord.q},${tile.coord.r}`;
         if (!visibleHexes.has(hexKey)) {
-          const pos = HexMath.hexToPixel(tile.coord, this.hexRadius);
+          const coord = isFlipped ? { q: -tile.coord.q, r: -tile.coord.r } : tile.coord;
+          const pos = HexMath.hexToPixel(coord, this.hexRadius);
           this.drawHexagon(
             this.ctx,
             centerX + pos.x,
@@ -464,7 +467,8 @@ export class Canvas2DRenderer {
 
     if (deployZoneHexes && deployZoneHexes.length > 0) {
       for (const hex of deployZoneHexes) {
-        const pos = HexMath.hexToPixel(hex, this.hexRadius);
+        const coord = isFlipped ? { q: -hex.q, r: -hex.r } : hex;
+        const pos = HexMath.hexToPixel(coord, this.hexRadius);
         this.drawHexagon(this.ctx, centerX + pos.x, centerY + pos.y, this.hexRadius - 2, 'rgba(16, 185, 129, 0.25)', '#10B981');
       }
     }
@@ -472,7 +476,8 @@ export class Canvas2DRenderer {
     if (highlightHexes) {
       for (const [key] of highlightHexes.entries()) {
         const [q, r] = key.split(',').map(Number);
-        const pos = HexMath.hexToPixel({ q, r }, this.hexRadius);
+        const coord = isFlipped ? { q: -q, r: -r } : { q, r };
+        const pos = HexMath.hexToPixel(coord, this.hexRadius);
         this.drawHexagon(this.ctx, centerX + pos.x, centerY + pos.y, this.hexRadius - 2, 'rgba(59, 130, 246, 0.35)', '#3B82F6');
       }
     }
@@ -480,7 +485,9 @@ export class Canvas2DRenderer {
     if (pathPreview && pathPreview.length > 1) {
       this.ctx.beginPath();
       for (let i = 0; i < pathPreview.length; i++) {
-        const pos = HexMath.hexToPixel(pathPreview[i], this.hexRadius);
+        const hex = pathPreview[i];
+        const coord = isFlipped ? { q: -hex.q, r: -hex.r } : hex;
+        const pos = HexMath.hexToPixel(coord, this.hexRadius);
         const px = centerX + pos.x;
         const py = centerY + pos.y;
         if (i === 0) this.ctx.moveTo(px, py);
@@ -512,10 +519,11 @@ export class Canvas2DRenderer {
       let py = centerY;
 
       if (unit.animPos) {
-        px += unit.animPos.x;
-        py += unit.animPos.y;
+        px += isFlipped ? -unit.animPos.x : unit.animPos.x;
+        py += isFlipped ? -unit.animPos.y : unit.animPos.y;
       } else {
-        const pos = HexMath.hexToPixel(unit.position, this.hexRadius);
+        const coord = isFlipped ? { q: -unit.position.q, r: -unit.position.r } : unit.position;
+        const pos = HexMath.hexToPixel(coord, this.hexRadius);
         px += pos.x;
         py += pos.y;
       }
@@ -533,7 +541,8 @@ export class Canvas2DRenderer {
       this.ctx.restore();
 
       if (unit.assignedAction && unit.assignedAction.targetHex) {
-        const tPos = HexMath.hexToPixel(unit.assignedAction.targetHex, this.hexRadius);
+        const tCoord = isFlipped ? { q: -unit.assignedAction.targetHex.q, r: -unit.assignedAction.targetHex.r } : unit.assignedAction.targetHex;
+        const tPos = HexMath.hexToPixel(tCoord, this.hexRadius);
         this.drawTargetFlag(this.ctx, centerX + tPos.x, centerY + tPos.y);
       }
     }

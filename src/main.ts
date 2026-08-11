@@ -152,7 +152,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     units.length = 0;
     units.push(...createDefaultUnits());
-    renderer.cacheTerrain(mapTiles);
+    renderer.cacheTerrain(mapTiles, pvpMode && myPvpColor === '#EF4444');
     updateTileOccupancy();
 
     turnManager.setPhase('DEPLOYMENT');
@@ -164,13 +164,8 @@ window.addEventListener('DOMContentLoaded', () => {
     const surrenderBtn = document.getElementById('btn-surrender');
     if (surrenderBtn) surrenderBtn.style.display = 'flex';
 
-    // FIX BUG-0001: Flip canvas 180° for Player 2 (Red) so their units appear at bottom
-    if (assignedColor === '#EF4444') {
-      canvas.style.transform = 'rotate(180deg)';
-      canvas.style.transformOrigin = 'center center';
-    } else {
-      canvas.style.transform = '';
-    }
+    // Remove CSS transform rotate — we now flip coordinates in logic so text/sprites stay right-side up!
+    canvas.style.transform = '';
 
     // Reset battle-ready flags for new match
     pvpBattleReadyMe = false;
@@ -1273,12 +1268,13 @@ window.addEventListener('DOMContentLoaded', () => {
     const rect = canvas.getBoundingClientRect();
     let px = (evt.clientX - rect.left - rect.width / 2);
     let py = (evt.clientY - rect.top - (rect.height / 2 - 40));
-    // FIX BUG-0001: Player 2 canvas is rotated 180° — invert click coords to match
+    
+    let hex = HexMath.pixelToHex({ x: px, y: py }, renderer.getHexRadius());
+    // For Player 2 (Red), map perspective is inverted (q, r) -> (-q, -r) so their army is at bottom
     if (pvpMode && myPvpColor === '#EF4444') {
-      px = -px;
-      py = -py;
+      hex = { q: -hex.q, r: -hex.r };
     }
-    return HexMath.pixelToHex({ x: px, y: py }, renderer.getHexRadius());
+    return hex;
   }
 
   canvas.addEventListener('mousemove', (evt) => {
@@ -1550,7 +1546,8 @@ window.addEventListener('DOMContentLoaded', () => {
       floatingTexts,
       undefined,
       turnManager.getPhase() !== 'DEPLOYMENT' ? visibleHexes : undefined,
-      turnManager.getPhase() === 'DEPLOYMENT'
+      turnManager.getPhase() === 'DEPLOYMENT',
+      pvpMode && myPvpColor === '#EF4444'
     );
 
     requestAnimationFrame(loop);
