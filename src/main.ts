@@ -157,11 +157,14 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function updateActionButtonsUI(unit: RenderableUnit | null) {
     const btnSkill = document.getElementById('btn-skill');
+    const planControls = document.getElementById('planning-controls');
 
     if (unit && unit.ownerColor === '#3B82F6') {
       const armyClass = (unit.armyClass || 'SHORT_SPEAR') as ArmyClassId;
       const skillType = SkillResolver.getSkillForClass(armyClass);
       const skillDef = SkillResolver.getSkillDefinition(skillType);
+
+      if (planControls) planControls.style.display = 'flex';
 
       if (btnSkill) {
         // IF UNIT HAS ALREADY ASSIGNED AN ACTION -> Show Cancel Action Option!
@@ -179,11 +182,7 @@ window.addEventListener('DOMContentLoaded', () => {
         }
       }
     } else {
-      if (btnSkill) {
-        btnSkill.innerText = '🔥 Kỹ Năng Đặc Biệt';
-        btnSkill.style.display = 'flex';
-        btnSkill.style.background = 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.3) 100%)';
-      }
+      if (planControls) planControls.style.display = 'none';
     }
   }
 
@@ -258,6 +257,9 @@ window.addEventListener('DOMContentLoaded', () => {
     turnManager.setPhase('RESOLUTION');
     turnManager.stopTimer();
     selectUnit(null);
+
+    const globalTurnContainer = document.getElementById('global-turn-container');
+    if (globalTurnContainer) globalTurnContainer.style.display = 'none';
 
     const phaseTitle = document.getElementById('phase-title');
     if (phaseTitle) phaseTitle.innerText = 'Phase Xử Lý Hoạt Cảnh & VFX...';
@@ -583,6 +585,8 @@ window.addEventListener('DOMContentLoaded', () => {
     turnManager.setPhase('PLANNING');
 
     if (phaseTitle) phaseTitle.innerText = `Round ${currentRound} - Lập Kế Hoạch`;
+    if (globalTurnContainer) globalTurnContainer.style.display = 'block';
+
     updateAPBudget();
     startPlanningTimer();
   }
@@ -819,12 +823,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
     const resultModal = document.getElementById('result-modal');
     const deckDrawer = document.getElementById('deck-drawer');
-    const planControls = document.getElementById('planning-controls');
+    const globalTurnContainer = document.getElementById('global-turn-container');
     const phaseTitle = document.getElementById('phase-title');
 
     if (resultModal) resultModal.style.display = 'none';
     if (deckDrawer) deckDrawer.style.display = 'flex';
-    if (planControls) planControls.style.display = 'none';
+    if (globalTurnContainer) globalTurnContainer.style.display = 'none';
     if (phaseTitle) phaseTitle.innerText = 'Phase Chuẩn Bị Xếp Quân';
 
     selectUnit(null);
@@ -833,11 +837,11 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-start-battle')?.addEventListener('click', () => {
     turnManager.setPhase('PLANNING');
     const deckDrawer = document.getElementById('deck-drawer');
-    const planControls = document.getElementById('planning-controls');
+    const globalTurnContainer = document.getElementById('global-turn-container');
     const phaseTitle = document.getElementById('phase-title');
 
     if (deckDrawer) deckDrawer.style.display = 'none';
-    if (planControls) planControls.style.display = 'flex';
+    if (globalTurnContainer) globalTurnContainer.style.display = 'block';
     if (phaseTitle) phaseTitle.innerText = 'Round 1 - Lập Kế Hoạch';
 
     selectUnit(null);

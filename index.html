@@ -1,25 +1,22 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HEX LEGION — Tactical Hexagonal Strategy</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hexa Strategy - Web Canvas Game Engine</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-dark: #070B12;
-      --panel-bg: rgba(13, 20, 36, 0.78);
+      --bg-dark: #090D16;
+      --panel-bg: rgba(15, 23, 42, 0.75);
       --panel-border: rgba(255, 255, 255, 0.12);
-      --accent-blue: #3B82F6;
-      --accent-blue-glow: rgba(59, 130, 246, 0.4);
-      --accent-gold: #F59E0B;
-      --accent-gold-glow: rgba(245, 158, 11, 0.4);
-      --accent-red: #EF4444;
-      --accent-green: #10B981;
       --text-main: #F8FAFC;
       --text-muted: #94A3B8;
+      --accent-gold: #F59E0B;
+      --accent-blue: #3B82F6;
+      --accent-blue-glow: rgba(59, 130, 246, 0.4);
     }
 
     * {
@@ -29,76 +26,80 @@
       user-select: none;
     }
 
-    body {
-      background-color: var(--bg-dark);
-      color: var(--text-main);
-      font-family: 'Plus Jakarta Sans', sans-serif;
+    body, html {
+      width: 100%;
+      height: 100%;
       overflow: hidden;
-      width: 100vw;
-      height: 100vh;
+      background-color: var(--bg-dark);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: var(--text-main);
     }
 
     #game-container {
       position: relative;
-      width: 100%;
-      height: 100%;
-      display: flex;
+      width: 100vw;
+      height: 100vh;
     }
 
     canvas {
       display: block;
       width: 100%;
       height: 100%;
-      background: radial-gradient(circle at 50% 40%, #172439 0%, #0D1424 65%, #05080E 100%);
     }
 
     /* Top HUD Bar */
     .hud-top {
       position: absolute;
-      top: 18px;
+      top: 20px;
       left: 50%;
       transform: translateX(-50%);
       display: flex;
       align-items: center;
-      gap: 20px;
+      gap: 16px;
       padding: 10px 24px;
       background: var(--panel-bg);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--panel-border);
       border-radius: 999px;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.2);
       z-index: 20;
     }
 
     .timer-badge {
       display: flex;
       align-items: center;
-      gap: 8px;
-    }
-
-    .timer-ring {
+      justify-content: center;
       width: 42px;
       height: 42px;
       border-radius: 50%;
-      background: conic-gradient(var(--accent-gold) 100%, rgba(255,255,255,0.08) 0%);
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      position: relative;
+    }
+
+    .timer-ring {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: conic-gradient(var(--accent-gold) 100%, rgba(255,255,255,0.1) 0%);
       display: flex;
-      justify-content: center;
       align-items: center;
-      box-shadow: 0 0 16px var(--accent-gold-glow);
+      justify-content: center;
+      transition: background 0.2s linear;
     }
 
     .timer-inner {
-      width: 34px;
-      height: 34px;
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
-      background: #0B111E;
+      background: #0F172A;
       display: flex;
-      justify-content: center;
       align-items: center;
+      justify-content: center;
       font-family: 'Outfit', sans-serif;
       font-weight: 800;
-      font-size: 15px;
+      font-size: 14px;
       color: var(--accent-gold);
     }
 
@@ -106,7 +107,7 @@
       display: flex;
       flex-direction: column;
       gap: 4px;
-      min-width: 220px;
+      width: 220px;
     }
 
     .ap-label {
@@ -229,7 +230,7 @@
       border: 1px solid rgba(59, 130, 246, 0.3);
     }
 
-    /* Bottom Action Controls */
+    /* Bottom Action Controls for Selected Unit */
     .controls-panel {
       position: absolute;
       bottom: 24px;
@@ -396,15 +397,19 @@
     <!-- HTML5 Canvas -->
     <canvas id="game-canvas"></canvas>
 
-    <!-- Bottom Controls -->
+    <!-- Bottom Center Unit Skill Action Control Panel -->
     <div class="controls-panel" id="planning-controls" style="display: none;">
       <button class="btn-action" id="btn-skill" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.3) 100%); border-color: #F59E0B; color: #FBBF24; box-shadow: 0 0 12px rgba(245, 158, 11, 0.3);">
         🔥 Kỹ Năng Đặc Biệt
       </button>
-      <button class="btn-action primary" id="btn-end-turn">🚀 Gửi Lượt (Lock)</button>
     </div>
 
-
+    <!-- Global Dedicated End Turn / Lock Button (Bottom Right Corner) -->
+    <div id="global-turn-container" style="position: absolute; bottom: 24px; right: 24px; z-index: 30; display: none;">
+      <button class="btn-action primary" id="btn-end-turn" style="padding: 12px 24px; font-size: 14px; font-weight: 800; border-radius: 16px; background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); box-shadow: 0 8px 25px rgba(37, 99, 235, 0.6); border: 1px solid #60A5FA;">
+        🚀 Gửi Lượt (Lock Turn)
+      </button>
+    </div>
 
     <!-- Victory / Defeat Modal -->
     <div id="result-modal" class="modal-overlay">
