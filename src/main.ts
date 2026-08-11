@@ -175,7 +175,7 @@ window.addEventListener('DOMContentLoaded', () => {
         btnSkill.innerText = '🔥 Kỹ Năng Đặc Biệt';
         btnSkill.style.display = 'flex';
       }
-      if (btnBrace) btnBrace.style.display = 'none'; // Hide brace if no unit selected
+      if (btnBrace) btnBrace.style.display = 'none';
     }
   }
 
@@ -313,6 +313,9 @@ window.addEventListener('DOMContentLoaded', () => {
         const action = u.assignedAction;
         if (!action || !action.targetHex) continue;
 
+        // FIX #1: SKILL AND ATTACK ACTIONS DO NOT MOVE IN THE MOVEMENT PHASE! ONLY MOVE TYPE ACTIONS MOVE!
+        if (action.type !== 'MOVE') continue;
+
         const startPos = { ...u.position };
         let endPos = { ...action.targetHex };
 
@@ -383,11 +386,25 @@ window.addEventListener('DOMContentLoaded', () => {
           const startPx = HexMath.hexToPixel(u.position, renderer.getHexRadius());
           const targetPx = action.targetHex ? HexMath.hexToPixel(action.targetHex, renderer.getHexRadius()) : startPx;
 
-          // FIX #3: CAVALRY CHARGE SQUAD DASH (No Arrow Projectile!)
+          // FIX #2: CAVALRY CHARGE DASH TO ADJACENT UN-OCCUPIED TILE (Do not land on top of enemy!)
           if (sType === 'CAVALRY_CHARGE' && action.targetHex) {
+            // Find unoccupied adjacent hex to target
+            const attackPosRes = HexPathfinder.findAttackPosition(
+              u.position,
+              action.targetHex,
+              1,
+              4,
+              u.category,
+              getTileForPathfinding
+            );
+
+            const stopHex = (attackPosRes && attackPosRes.path.length > 0)
+              ? attackPosRes.path[attackPosRes.path.length - 1]
+              : u.position;
+
             u.isMoving = true;
             const pFrom = HexMath.hexToPixel(u.position, renderer.getHexRadius());
-            const pTo = HexMath.hexToPixel(action.targetHex, renderer.getHexRadius());
+            const pTo = HexMath.hexToPixel(stopHex, renderer.getHexRadius());
             const dx = pTo.x - pFrom.x;
             const dy = pTo.y - pFrom.y;
             const angle = Math.atan2(dy, dx);
@@ -403,12 +420,13 @@ window.addEventListener('DOMContentLoaded', () => {
               await new Promise((r) => setTimeout(r, 14));
             }
 
-            u.position = { ...action.targetHex };
+            u.position = { ...stopHex };
             delete u.animPos;
             u.isMoving = false;
             updateTileOccupancy();
 
-            if (targetUnit) {
+            // Deal Damage & Impact FX to targetUnit (the enemy!)
+            if (targetUnit && targetUnit.id !== u.id) {
               const skillRes = SkillResolver.executeSkill(attackerClass, sType, u.position, action.targetHex, ArmyRegistry.getStats((targetUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId).defense);
               targetUnit.hp = Math.max(0, targetUnit.hp - skillRes.primaryDamage);
               const pos = HexMath.hexToPixel(targetUnit.position, renderer.getHexRadius());
@@ -418,14 +436,14 @@ window.addEventListener('DOMContentLoaded', () => {
             }
             await new Promise((r) => setTimeout(r, 300));
           }
-          // FIX #4: SPEAR WALL / SHIELD WALL (Solid Diamond/Triangle Phalanx Shield Barrier)
+          // SPEAR WALL / SHIELD WALL (Solid Diamond/Triangle Phalanx Shield Barrier)
           else if (sType === 'SPEAR_WALL' || sType === 'SHIELD_WALL_DEFENSE') {
             const pos = HexMath.hexToPixel(u.position, renderer.getHexRadius());
             renderer.getVFXManager().spawnDiamondPhalanxBarrier(pos.x, pos.y);
             floatingTexts.push({ x: pos.x, y: pos.y - 30, text: sType === 'SPEAR_WALL' ? 'SPEAR PHALANX!' : '+80% DEF!', color: '#F59E0B', alpha: 1.0 });
             await new Promise((r) => setTimeout(r, 400));
           }
-          // FIX #2: ARCHER VOLLEY FIRE ARROWS & BURNING FLAME GROUND
+          // ARCHER VOLLEY FIRE ARROWS & BURNING FLAME GROUND
           else {
             let projType: ProjectileType = sType === 'FIRE_ARROW' ? 'FIRE_ARROW' : (attackerClass.includes('CROSSBOW') ? 'CROSSBOW_BOLT' : 'CATAPULT_BOULDER');
             let projFinished = false;
@@ -440,7 +458,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
             const skillRes = SkillResolver.executeSkill(attackerClass, sType, u.position, action.targetHex || u.position, targetUnit ? ArmyRegistry.getStats((targetUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId).defense : 20);
 
-            if (targetUnit) {
+            if (targetUnit && targetUnit.id !== u.id) {
               targetUnit.hp = Math.max(0, targetUnit.hp - skillRes.primaryDamage);
               const pos = HexMath.hexToPixel(targetUnit.position, renderer.getHexRadius());
               floatingTexts.push({ x: pos.x, y: pos.y - 30, text: `-${skillRes.primaryDamage} ${skillRes.appliedStatus || 'SKILL!'}`, color: '#F59E0B', alpha: 1.0 });
@@ -451,7 +469,7 @@ window.addEventListener('DOMContentLoaded', () => {
           }
         }
         // REGULAR ATTACK
-        else if (action.type === 'ATTACK' && targetUnit && targetUnit.hp > 0) {
+        else if (action.type === 'ATTACK' && targetUnit && targetUnit.hp > 0 && targetUnit.id !== u.id) {
           const dist = HexMath.getDistance(u.position, targetUnit.position);
           const stats = ArmyRegistry.getStats(attackerClass);
 
@@ -553,7 +571,6 @@ window.addEventListener('DOMContentLoaded', () => {
     hoveredHex = getCanvasHex(evt);
   });
 
-  // FIX #1: INTERACTIVE TARGETING MODE WHEN SKILL BUTTON IS CLICKED
   canvas.addEventListener('click', (evt) => {
     const clickedHex = getCanvasHex(evt);
 
