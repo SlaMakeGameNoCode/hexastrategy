@@ -2,6 +2,12 @@ import { HexMath, HexCoord } from '../core/hex-math.js';
 import { TerrainType } from '../core/terrain-matrix.js';
 import { VFXManager } from './vfx-manager.js';
 
+export interface UnitStatusEffect {
+  type: 'BURN' | 'SHIELD_WALL' | 'BRACE';
+  duration: number;
+  damagePerRound?: number;
+}
+
 export interface RenderableUnit {
   id: string;
   name: string;
@@ -21,6 +27,7 @@ export interface RenderableUnit {
   ownerColor: string;
   hasActedThisRound?: boolean;
   isStealthed?: boolean;
+  statusEffects?: UnitStatusEffect[];
   assignedAction?: {
     type: 'MOVE' | 'ATTACK' | 'BRACE' | 'SKILL';
     targetHex?: HexCoord;
@@ -695,7 +702,6 @@ export class Canvas2DRenderer {
       ctx.lineWidth = 2.0;
 
       if (cls.includes('SPEAR')) {
-        // Pike/Spear Shaft & Metallic Spearhead Tip
         ctx.strokeStyle = '#78350F';
         ctx.lineWidth = 2.2;
         ctx.beginPath();
@@ -711,7 +717,6 @@ export class Canvas2DRenderer {
         ctx.closePath();
         ctx.fill();
       } else if (cls === 'SWORD_SHIELD') {
-        // Broadsword & Round Iron Shield
         ctx.fillStyle = '#475569';
         ctx.strokeStyle = '#1E293B';
         ctx.lineWidth = 1.5;
@@ -732,7 +737,6 @@ export class Canvas2DRenderer {
         ctx.lineTo(drawX + 14, drawY - 14);
         ctx.stroke();
       } else if (cls === 'GREATSWORD') {
-        // Massive Two-Handed Greatsword
         ctx.strokeStyle = '#94A3B8';
         ctx.lineWidth = 3.5;
         ctx.beginPath();
@@ -747,7 +751,6 @@ export class Canvas2DRenderer {
         ctx.lineTo(drawX + 14, drawY - 8);
         ctx.stroke();
       } else if (cls.includes('CROSSBOW')) {
-        // HD Pistol-Grip Wooden Crossbow & Steel Bow Limbs
         const isHeavy = cls === 'HEAVY_CROSSBOW';
         const cx = drawX + 4;
         const cy = drawY - 6;
@@ -791,7 +794,6 @@ export class Canvas2DRenderer {
         ctx.lineTo(frontX + 6, cy);
         ctx.stroke();
       } else if (cls.includes('BOW')) {
-        // Curved Wooden Bow Staff & Nocked Arrow
         const isLong = cls === 'LONGBOW';
         const bowRadius = isLong ? 13 : 9;
         const bx = drawX + 6;
@@ -856,6 +858,16 @@ export class Canvas2DRenderer {
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
       ctx.lineWidth = 1;
       ctx.strokeRect(drawX - barW / 2, barY, barW, barH);
+
+      // Render Active Status Badges (e.g. Flame icon 🔥 for BURN status)
+      if (unit.statusEffects && unit.statusEffects.length > 0) {
+        const hasBurn = unit.statusEffects.some(s => s.type === 'BURN');
+        if (hasBurn) {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = 'bold 12px Outfit, sans-serif';
+          ctx.fillText('🔥', drawX + 22, barY - 2);
+        }
+      }
     }
   }
 

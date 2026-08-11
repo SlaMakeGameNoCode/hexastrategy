@@ -566,6 +566,32 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     }
 
+    // TICK BURN STATUS DAMAGE AT THE START OF RESOLUTION PHASE
+    let hasBurnTicked = false;
+    for (const u of units) {
+      if (u.hp > 0 && u.statusEffects && u.statusEffects.length > 0) {
+        for (let i = u.statusEffects.length - 1; i >= 0; i--) {
+          const st = u.statusEffects[i];
+          if (st.type === 'BURN') {
+            const burnDmg = st.damagePerRound || 15;
+            u.hp = Math.max(0, u.hp - burnDmg);
+            const pos = HexMath.hexToPixel(u.position, renderer.getHexRadius());
+            floatingTexts.push({ x: pos.x, y: pos.y - 35, text: `🔥 -${burnDmg} THIÊU ĐỐT!`, color: '#F97316', alpha: 1.0 });
+            renderer.getVFXManager().spawnExplosion(pos.x, pos.y, '#F97316', 12);
+            hasBurnTicked = true;
+
+            st.duration -= 1;
+            if (st.duration <= 0) {
+              u.statusEffects.splice(i, 1);
+            }
+          }
+        }
+      }
+    }
+    if (hasBurnTicked) {
+      await new Promise((r) => setTimeout(r, 450));
+    }
+
     const playerUnits = units.filter(u => u.ownerColor === '#3B82F6' && u.hp > 0 && u.assignedAction);
     const botUnits = units.filter(u => u.ownerColor === '#EF4444' && u.hp > 0 && u.assignedAction);
 
@@ -774,6 +800,12 @@ window.addEventListener('DOMContentLoaded', () => {
               const pos = HexMath.hexToPixel(targetUnit.position, renderer.getHexRadius());
               const labelText = sType === 'FIRE_ARROW' && defenderTerrain === 'FOREST' ? `-${bonusDmg} 🔥 CHÁY RỪNG!` : `-${bonusDmg} ${skillRes.appliedStatus || 'SKILL!'}`;
               floatingTexts.push({ x: pos.x, y: pos.y - 30, text: labelText, color: '#F97316', alpha: 1.0 });
+
+              if (sType === 'FIRE_ARROW') {
+                if (!targetUnit.statusEffects) targetUnit.statusEffects = [];
+                targetUnit.statusEffects.push({ type: 'BURN', duration: 2, damagePerRound: 15 });
+                renderer.getVFXManager().spawnGroundFlame(pos.x, pos.y);
+              }
             }
 
             renderer.triggerScreenShake(10, 300);
