@@ -99,6 +99,9 @@ export class Canvas2DRenderer {
     }
   }
 
+  /**
+   * Caches static 2D terrain background graphics with rich visual art style.
+   */
   public cacheTerrain(tiles: MapTileRenderData[]): void {
     const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
     const width = this.logicalWidth;
@@ -117,15 +120,311 @@ export class Canvas2DRenderer {
 
     for (const tile of tiles) {
       const pos = HexMath.hexToPixel(tile.coord, this.hexRadius);
+      const cx = centerX + pos.x;
+      const cy = centerY + pos.y;
+
+      // 1. Base Hex Floor Color & Outer Grid Border
       this.drawHexagon(
         offCtx,
-        centerX + pos.x,
-        centerY + pos.y,
+        cx,
+        cy,
         this.hexRadius,
-        this.getTerrainColor(tile.terrain),
-        '#1E293B'
+        this.getTerrainBaseColor(tile.terrain),
+        'rgba(30, 41, 59, 0.85)'
       );
+
+      // 2. Render Hand-Drawn Style Terrain Visual Graphics
+      switch (tile.terrain) {
+        case 'FOREST':
+          this.drawForestTile(offCtx, cx, cy);
+          break;
+        case 'MOUNTAIN':
+          this.drawMountainTile(offCtx, cx, cy);
+          break;
+        case 'HIGH_GROUND':
+          this.drawHighGroundTile(offCtx, cx, cy);
+          break;
+        case 'RUINS':
+          this.drawRuinsTile(offCtx, cx, cy);
+          break;
+        case 'WATER':
+          this.drawWaterTile(offCtx, cx, cy);
+          break;
+        case 'ROAD':
+          this.drawRoadTile(offCtx, cx, cy);
+          break;
+        case 'GROUND':
+          this.drawGroundTile(offCtx, cx, cy);
+          break;
+      }
     }
+  }
+
+  /**
+   * Renders clusters of detailed pine trees with ink outlines & highlights (Forest Art).
+   */
+  private drawForestTile(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
+    // 5 Tree positions inside hex
+    const treeOffsets = [
+      { x: -8, y: -6, scale: 0.9 },
+      { x: 7, y: -8, scale: 1.0 },
+      { x: -10, y: 6, scale: 1.05 },
+      { x: 4, y: 7, scale: 1.1 },
+      { x: 0, y: -1, scale: 1.2 } // Center front tree
+    ];
+
+    for (const tree of treeOffsets) {
+      const tx = cx + tree.x;
+      const ty = cy + tree.y;
+      const s = tree.scale;
+
+      ctx.save();
+      // Tree Shadow
+      ctx.beginPath();
+      ctx.ellipse(tx, ty + 10 * s, 7 * s, 3 * s, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+      ctx.fill();
+
+      // Brown Trunk
+      ctx.fillStyle = '#4A2E19';
+      ctx.fillRect(tx - 1.5 * s, ty + 2 * s, 3 * s, 8 * s);
+
+      // Tier 3 (Bottom Foliage)
+      ctx.beginPath();
+      ctx.moveTo(tx, ty - 6 * s);
+      ctx.lineTo(tx + 9 * s, ty + 4 * s);
+      ctx.lineTo(tx - 9 * s, ty + 4 * s);
+      ctx.closePath();
+      ctx.fillStyle = '#2E6930';
+      ctx.fill();
+      ctx.strokeStyle = '#153E17';
+      ctx.lineWidth = 1.0;
+      ctx.stroke();
+
+      // Tier 2 (Middle Foliage)
+      ctx.beginPath();
+      ctx.moveTo(tx, ty - 11 * s);
+      ctx.lineTo(tx + 7 * s, ty - 1 * s);
+      ctx.lineTo(tx - 7 * s, ty - 1 * s);
+      ctx.closePath();
+      ctx.fillStyle = '#388E3C';
+      ctx.fill();
+      ctx.stroke();
+
+      // Tier 1 (Top Tip)
+      ctx.beginPath();
+      ctx.moveTo(tx, ty - 16 * s);
+      ctx.lineTo(tx + 5 * s, ty - 6 * s);
+      ctx.lineTo(tx - 5 * s, ty - 6 * s);
+      ctx.closePath();
+      ctx.fillStyle = '#4CAF50';
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.restore();
+    }
+  }
+
+  /**
+   * Renders jagged rocky mountain peaks with dark ink outlines & shading (Mountain Art).
+   */
+  private drawMountainTile(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
+    const peaks = [
+      { x: -7, y: 3, w: 18, h: 20 },
+      { x: 8, y: 4, w: 16, h: 18 },
+      { x: 0, y: -4, w: 22, h: 26 } // Tallest central peak
+    ];
+
+    for (const peak of peaks) {
+      const px = cx + peak.x;
+      const py = cy + peak.y;
+      const hw = peak.w / 2;
+
+      ctx.save();
+      // Mountain Base Shadow
+      ctx.beginPath();
+      ctx.ellipse(px, py + 4, hw + 2, 4, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      ctx.fill();
+
+      // Shaded Left Slope (Dark Rocky Brown)
+      ctx.beginPath();
+      ctx.moveTo(px, py - peak.h);
+      ctx.lineTo(px - hw, py + 4);
+      ctx.lineTo(px, py + 4);
+      ctx.closePath();
+      ctx.fillStyle = '#5D4037';
+      ctx.fill();
+
+      // Highlighted Right Slope (Warm Ochre/Tan)
+      ctx.beginPath();
+      ctx.moveTo(px, py - peak.h);
+      ctx.lineTo(px + hw, py + 4);
+      ctx.lineTo(px, py + 4);
+      ctx.closePath();
+      ctx.fillStyle = '#A1887F';
+      ctx.fill();
+
+      // Dark Ink Outline
+      ctx.beginPath();
+      ctx.moveTo(px - hw, py + 4);
+      ctx.lineTo(px, py - peak.h);
+      ctx.lineTo(px + hw, py + 4);
+      ctx.strokeStyle = '#2C1A04';
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+
+      // Ridge Line Down Center
+      ctx.beginPath();
+      ctx.moveTo(px, py - peak.h);
+      ctx.lineTo(px - 1, py + 4);
+      ctx.strokeStyle = '#2C1A04';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      // Snow Cap on Top Peak
+      ctx.beginPath();
+      ctx.moveTo(px, py - peak.h);
+      ctx.lineTo(px + 4, py - peak.h + 7);
+      ctx.lineTo(px - 4, py - peak.h + 7);
+      ctx.closePath();
+      ctx.fillStyle = '#ECEFF1';
+      ctx.fill();
+
+      ctx.restore();
+    }
+  }
+
+  /**
+   * Renders smooth rolling hill contours and mound ridges (High Ground Art).
+   */
+  private drawHighGroundTile(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
+    ctx.save();
+    // Rolling Hill Curves
+    const hills = [
+      { x: -6, y: -4, r: 12 },
+      { x: 7, y: -2, r: 10 },
+      { x: 0, y: 5, r: 14 }
+    ];
+
+    for (const h of hills) {
+      const hx = cx + h.x;
+      const hy = cy + h.y;
+
+      // Hill Mound Fill
+      ctx.beginPath();
+      ctx.arc(hx, hy, h.r, Math.PI * 0.9, Math.PI * 2.1);
+      ctx.fillStyle = '#D9A74A';
+      ctx.fill();
+
+      // Contour Ridge Line
+      ctx.strokeStyle = '#8C671D';
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Renders crumbled ancient stone pillars and brick ruins (Ruins Art).
+   */
+  private drawRuinsTile(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
+    ctx.save();
+    ctx.fillStyle = '#78909C';
+    ctx.strokeStyle = '#263238';
+    ctx.lineWidth = 1.4;
+
+    // Pillar 1 (Left broken)
+    ctx.fillRect(cx - 12, cy - 8, 6, 16);
+    ctx.strokeRect(cx - 12, cy - 8, 6, 16);
+
+    // Pillar 2 (Right tall)
+    ctx.fillRect(cx + 6, cy - 14, 6, 22);
+    ctx.strokeRect(cx + 6, cy - 14, 6, 22);
+
+    // Broken Arch Top
+    ctx.fillRect(cx - 14, cy - 14, 14, 4);
+    ctx.strokeRect(cx - 14, cy - 14, 14, 4);
+
+    // Scattered Stone Blocks
+    ctx.fillRect(cx - 2, cy + 6, 7, 5);
+    ctx.strokeRect(cx - 2, cy + 6, 7, 5);
+    ctx.fillRect(cx + 10, cy + 5, 5, 4);
+    ctx.strokeRect(cx + 10, cy + 5, 5, 4);
+
+    ctx.restore();
+  }
+
+  /**
+   * Renders blue water currents and wave ripple arcs (Water Art).
+   */
+  private drawWaterTile(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    ctx.lineWidth = 1.3;
+
+    // 3 Wave Ripples
+    const waves = [
+      { x: cx - 10, y: cy - 6, w: 12 },
+      { x: cx + 2, y: cy + 2, w: 14 },
+      { x: cx - 8, y: cy + 10, w: 10 }
+    ];
+
+    for (const w of waves) {
+      ctx.beginPath();
+      ctx.arc(w.x, w.y, w.w, Math.PI * 0.1, Math.PI * 0.9);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Renders cobblestone/dirt road track path (Road Art).
+   */
+  private drawRoadTile(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
+    ctx.save();
+    // Central Road Strip
+    ctx.beginPath();
+    ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+    ctx.fillStyle = '#D4B86A';
+    ctx.fill();
+    ctx.strokeStyle = '#A68A38';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Small Cobblestones
+    ctx.fillStyle = '#8C6F2D';
+    const stones = [
+      { x: -5, y: -4 }, { x: 4, y: -5 }, { x: -2, y: 3 }, { x: 5, y: 4 }
+    ];
+    for (const s of stones) {
+      ctx.fillRect(cx + s.x, cy + s.y, 3, 2);
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Renders subtle grass tufts and stippling (Ground Grassland Art).
+   */
+  private drawGroundTile(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
+    ctx.save();
+    ctx.strokeStyle = '#558B2F';
+    ctx.lineWidth = 1.2;
+
+    const tufts = [
+      { x: cx - 8, y: cy - 4 },
+      { x: cx + 6, y: cy + 5 }
+    ];
+
+    for (const t of tufts) {
+      ctx.beginPath();
+      ctx.moveTo(t.x, t.y);
+      ctx.lineTo(t.x - 2, t.y - 5);
+      ctx.moveTo(t.x, t.y);
+      ctx.lineTo(t.x + 2, t.y - 6);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   public triggerScreenShake(intensity: number = 8, durationMs: number = 250): void {
@@ -249,10 +548,9 @@ export class Canvas2DRenderer {
       const isBlue = unit.ownerColor === '#3B82F6';
       const hexKey = `${unit.position.q},${unit.position.r}`;
 
-      // Fog of War / Stealth Visibility Check for Enemy Units
       if (!isBlue) {
-        if (visibleHexes && !visibleHexes.has(hexKey)) continue; // Enemy hidden in Fog of War!
-        if (unit.isStealthed) continue; // Enemy hidden in Stealth!
+        if (visibleHexes && !visibleHexes.has(hexKey)) continue;
+        if (unit.isStealthed) continue;
       }
 
       let px = centerX;
@@ -271,14 +569,13 @@ export class Canvas2DRenderer {
 
       this.ctx.save();
       if (isBlue && unit.isStealthed) {
-        this.ctx.globalAlpha = 0.45; // Render stealthed friendly unit semi-transparent
+        this.ctx.globalAlpha = 0.45;
       }
 
       this.drawUnit(this.ctx, px, py, unit, isSelected);
 
       this.ctx.restore();
 
-      // Render Planned Action Target Indicator
       if (unit.assignedAction && unit.assignedAction.targetHex) {
         const tPos = HexMath.hexToPixel(unit.assignedAction.targetHex, this.hexRadius);
         this.drawTargetFlag(this.ctx, centerX + tPos.x, centerY + tPos.y);
@@ -431,7 +728,6 @@ export class Canvas2DRenderer {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // Show Stealth 🥷 badge if stealthed!
     const icon = unit.isStealthed ? '🥷' : this.getArmyIcon(unit.armyClass || unit.category);
     ctx.fillText(icon, drawX, flagY);
     ctx.restore();
@@ -498,16 +794,16 @@ export class Canvas2DRenderer {
     ctx.stroke();
   }
 
-  private getTerrainColor(terrain: TerrainType): string {
+  private getTerrainBaseColor(terrain: TerrainType): string {
     switch (terrain) {
-      case 'ROAD': return '#475569';
-      case 'GROUND': return '#1E293B';
-      case 'HIGH_GROUND': return '#D97706';
-      case 'FOREST': return '#166534';
-      case 'RUINS': return '#78350F';
-      case 'MOUNTAIN': return '#334155';
-      case 'WATER': return '#0284C7';
-      default: return '#1E293B';
+      case 'ROAD': return '#C8B273';
+      case 'GROUND': return '#7FAF42';
+      case 'HIGH_GROUND': return '#A8C64F';
+      case 'FOREST': return '#437322';
+      case 'RUINS': return '#8D6E63';
+      case 'MOUNTAIN': return '#B17A3E';
+      case 'WATER': return '#1976D2';
+      default: return '#7FAF42';
     }
   }
 
