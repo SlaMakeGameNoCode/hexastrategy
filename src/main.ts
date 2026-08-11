@@ -158,11 +158,13 @@ window.addEventListener('DOMContentLoaded', () => {
       const skillDef = SkillResolver.getSkillDefinition(skillType);
 
       if (btnSkill) {
-        btnSkill.innerText = `${isTargetingSkillMode ? '🎯 Chọn Mục Tiêu...' : skillDef.name + ' (' + skillDef.apCost + ' AP)'}`;
+        btnSkill.innerText = `${isTargetingSkillMode ? '🎯 Click Địch / Ô Bắn (Hủy ✖️)' : skillDef.name + ' (' + skillDef.apCost + ' AP)'}`;
         btnSkill.style.display = 'flex';
+        btnSkill.style.background = isTargetingSkillMode
+          ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(220, 38, 38, 0.6) 100%)'
+          : 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.3) 100%)';
       }
 
-      // FIX #4: Only show `#btn-brace` if selected unit is a SPEAR unit (SHORT_SPEAR or LONG_SPEAR)!
       if (btnBrace) {
         if (armyClass === 'SHORT_SPEAR' || armyClass === 'LONG_SPEAR') {
           btnBrace.style.display = 'flex';
@@ -174,6 +176,7 @@ window.addEventListener('DOMContentLoaded', () => {
       if (btnSkill) {
         btnSkill.innerText = '🔥 Kỹ Năng Đặc Biệt';
         btnSkill.style.display = 'flex';
+        btnSkill.style.background = 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.3) 100%)';
       }
       if (btnBrace) btnBrace.style.display = 'none';
     }
@@ -307,13 +310,12 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     const executeTeamTurn = async (teamUnits: RenderableUnit[]) => {
-      // 1. Movement Phase
+      // 1. Movement Phase (ONLY MOVE actions move!)
       for (const u of teamUnits) {
         if (u.hp <= 0) continue;
         const action = u.assignedAction;
         if (!action || !action.targetHex) continue;
 
-        // FIX #1: SKILL AND ATTACK ACTIONS DO NOT MOVE IN THE MOVEMENT PHASE! ONLY MOVE TYPE ACTIONS MOVE!
         if (action.type !== 'MOVE') continue;
 
         const startPos = { ...u.position };
@@ -386,9 +388,8 @@ window.addEventListener('DOMContentLoaded', () => {
           const startPx = HexMath.hexToPixel(u.position, renderer.getHexRadius());
           const targetPx = action.targetHex ? HexMath.hexToPixel(action.targetHex, renderer.getHexRadius()) : startPx;
 
-          // FIX #2: CAVALRY CHARGE DASH TO ADJACENT UN-OCCUPIED TILE (Do not land on top of enemy!)
+          // CAVALRY CHARGE DASH TO ADJACENT UN-OCCUPIED TILE
           if (sType === 'CAVALRY_CHARGE' && action.targetHex) {
-            // Find unoccupied adjacent hex to target
             const attackPosRes = HexPathfinder.findAttackPosition(
               u.position,
               action.targetHex,
@@ -425,7 +426,6 @@ window.addEventListener('DOMContentLoaded', () => {
             u.isMoving = false;
             updateTileOccupancy();
 
-            // Deal Damage & Impact FX to targetUnit (the enemy!)
             if (targetUnit && targetUnit.id !== u.id) {
               const skillRes = SkillResolver.executeSkill(attackerClass, sType, u.position, action.targetHex, ArmyRegistry.getStats((targetUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId).defense);
               targetUnit.hp = Math.max(0, targetUnit.hp - skillRes.primaryDamage);
@@ -571,6 +571,14 @@ window.addEventListener('DOMContentLoaded', () => {
     hoveredHex = getCanvasHex(evt);
   });
 
+  // RIGHT-CLICK CANCELS SELECTION & SKILL TARGETING MODE IMMEDIATELY
+  canvas.addEventListener('contextmenu', (evt) => {
+    evt.preventDefault();
+    isTargetingSkillMode = false;
+    selectUnit(null);
+  });
+
+  // LEFT-CLICK EVENT HANDLER
   canvas.addEventListener('click', (evt) => {
     const clickedHex = getCanvasHex(evt);
 
@@ -613,7 +621,18 @@ window.addEventListener('DOMContentLoaded', () => {
       (u) => u.hp > 0 && u.position.q === clickedHex.q && u.position.r === clickedHex.r
     );
 
-    // IF IN SKILL TARGETING MODE -> Click hex/enemy to confirm target!
+    // 1. CLICK ON ANY PLAYER UNIT -> Always cancel targeting mode and select that unit!
+    if (clickedUnit && clickedUnit.ownerColor === '#3B82F6') {
+      isTargetingSkillMode = false;
+      if (!clickedUnit.hasActedThisRound) {
+        selectUnit(clickedUnit);
+      } else {
+        selectUnit(null);
+      }
+      return;
+    }
+
+    // 2. IF IN SKILL TARGETING MODE -> Click enemy or target hex to confirm skill target!
     if (isTargetingSkillMode && selectedUnit && !selectedUnit.hasActedThisRound) {
       const armyClass = (selectedUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId;
       const skillType = SkillResolver.getSkillForClass(armyClass);
@@ -635,15 +654,7 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // 1. Click on Unacted Player Unit -> Select it
-    if (clickedUnit && clickedUnit.ownerColor === '#3B82F6') {
-      if (!clickedUnit.hasActedThisRound) {
-        selectUnit(clickedUnit);
-      }
-      return;
-    }
-
-    // 2. Click on Enemy Unit -> Assign Attack Action
+    // 3. Click on Enemy Unit -> Assign Attack Action
     if (clickedUnit && clickedUnit.ownerColor === '#EF4444' && selectedUnit && !selectedUnit.hasActedThisRound) {
       const stats = ArmyRegistry.getStats((selectedUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId);
       const attackPosRes = HexPathfinder.findAttackPosition(
@@ -667,7 +678,7 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // 3. Click on Empty Reachable Hex -> Assign Move Action
+    // 4. Click on Empty Reachable Hex -> Assign Move Action
     if (selectedUnit && selectedUnit.ownerColor === '#3B82F6' && !selectedUnit.hasActedThisRound) {
       const tile = tileMap.get(HexPathfinder.hexKey(clickedHex));
       if (tile && tile.blockedByUnit) return;
@@ -695,7 +706,6 @@ window.addEventListener('DOMContentLoaded', () => {
       const skillDef = SkillResolver.getSkillDefinition(skillType);
 
       if (hud.getAPRemaining() >= skillDef.apCost) {
-        // Self-buff skills execute immediately (Spear Wall / Shield Wall)
         if (skillType === 'SPEAR_WALL' || skillType === 'SHIELD_WALL_DEFENSE') {
           selectedUnit.assignedAction = {
             type: 'SKILL',
@@ -707,8 +717,8 @@ window.addEventListener('DOMContentLoaded', () => {
           selectUnit(null);
           updateAPBudget();
         } else {
-          // Targeted Skills: Toggle Interactive Targeting Mode
-          isTargetingSkillMode = true;
+          // TOGGLE targeting mode: if already targeting, cancel it!
+          isTargetingSkillMode = !isTargetingSkillMode;
           updateActionButtonsUI(selectedUnit);
         }
       }
