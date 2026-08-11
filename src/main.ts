@@ -609,7 +609,8 @@ window.addEventListener('DOMContentLoaded', () => {
         const action = u.assignedAction;
         if (!action || !action.targetHex) continue;
 
-        if (action.type !== 'MOVE') continue;
+        if (action.type !== 'MOVE' && action.type !== 'ATTACK' && action.type !== 'SKILL') continue;
+        if (HexMath.getDistance(u.position, action.targetHex) === 0) continue;
 
         const startPos = { ...u.position };
         let endPos = { ...action.targetHex };
@@ -1221,8 +1222,23 @@ window.addEventListener('DOMContentLoaded', () => {
           }
         }
       } else if (hoveredHex) {
-        const pathRes = pathOverlay.getPathPreview(hoveredHex, getTileForPathfinding);
-        if (pathRes) pathPreviewCoords = pathRes.path;
+        const hoveredUnit = units.find(u => u.hp > 0 && u.position.q === hoveredHex!.q && u.position.r === hoveredHex!.r);
+        if (hoveredUnit && hoveredUnit.ownerColor === '#EF4444') {
+          const stats = ArmyRegistry.getStats((selectedUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId);
+          const effectiveRange = TerrainMatrix.getEffectiveRange(stats.range, selectedUnit.category, getTileTerrain(selectedUnit.position));
+          const attackPosRes = HexPathfinder.findAttackPosition(
+            selectedUnit.position,
+            hoveredHex,
+            effectiveRange,
+            stats.movementPoints,
+            selectedUnit.category,
+            getTileForPathfinding
+          );
+          if (attackPosRes) pathPreviewCoords = attackPosRes.path;
+        } else {
+          const pathRes = pathOverlay.getPathPreview(hoveredHex, getTileForPathfinding);
+          if (pathRes) pathPreviewCoords = pathRes.path;
+        }
       }
     }
 
