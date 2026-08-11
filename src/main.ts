@@ -171,6 +171,7 @@ window.addEventListener('DOMContentLoaded', () => {
     pvpBattleReadyMe = false;
     pvpBattleReadyOpponent = false;
     if (pvpBattleAutoTimer) { clearTimeout(pvpBattleAutoTimer); pvpBattleAutoTimer = null; }
+    showPvpWaiting(false);
 
     floatingTexts.push({ x: 0, y: -40, text: `⚔️ PVP! BẠN CHỈ HUY ${assignedColor === '#3B82F6' ? 'QUÂN XANH 🔵' : 'QUÂN ĐỎ 🔴'}`, color: '#10B981', alpha: 1.0 });
   });
@@ -181,9 +182,40 @@ window.addEventListener('DOMContentLoaded', () => {
       pvpOpponentActionsBuffer = msg.actions as Array<{ unitId: string; action: object }>;
       pvpTryResolve();
     } else if (msg.kind === 'BATTLE_START') {
-      // FIX BUG-0002: Opponent clicked "Bắt Đầu" — try to start battle
+      // Opponent clicked "Bắt Đầu" — try to start battle
       pvpBattleReadyOpponent = true;
-      pvpTryStartBattle();
+      if (pvpBattleReadyMe) {
+        showPvpWaiting(false);
+        actuallyStartBattle();
+      }
+    }
+  });
+
+  lobbyManager.onPlayerDisconnected((disconnectedUid, gracePeriodSec) => {
+    floatingTexts.push({ x: 0, y: -40, text: `🔌 ĐỐI THỦ BỊ MẤT KẾT NỐI (Đang chờ ${gracePeriodSec}s)...`, color: '#EF4444', alpha: 1.0 });
+    const overlay = document.getElementById('pvp-waiting-overlay');
+    const title = document.getElementById('pvp-waiting-title');
+    const desc = document.getElementById('pvp-waiting-desc');
+    if (overlay && title && desc) {
+      title.innerText = '🔌 ĐỐI THỦ BỊ MẤT KẾT NỐI';
+      desc.innerText = `Đang chờ đối thủ kết nối lại trong vòng ${gracePeriodSec} giây...`;
+      overlay.style.display = 'flex';
+    }
+  });
+
+  lobbyManager.onForfeitWin((winnerUid, reason) => {
+    showPvpWaiting(false);
+    turnManager.stopTimer();
+    const resultModal = document.getElementById('result-modal');
+    const resultTitle = document.getElementById('result-title');
+    const resultDesc = document.getElementById('result-desc');
+
+    if (resultModal && resultTitle && resultDesc) {
+      resultTitle.innerText = 'VICTORY!';
+      resultTitle.style.color = '#10B981';
+      resultDesc.innerText = `BẠN ĐÃ THẮNG! ${reason}`;
+      AuthService.recordMatchResult(true);
+      resultModal.style.display = 'flex';
     }
   });
 

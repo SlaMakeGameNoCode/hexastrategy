@@ -9,7 +9,7 @@ export interface OnlineUser {
 }
 
 export interface ChallengeMessage {
-  type: 'LOBBY_USERS' | 'CHALLENGE_REQUEST' | 'CHALLENGE_RESPONSE' | 'MATCH_START' | 'SURRENDER_MATCH' | 'GAME_ACTION';
+  type: 'LOBBY_USERS' | 'CHALLENGE_REQUEST' | 'CHALLENGE_RESPONSE' | 'MATCH_START' | 'SURRENDER_MATCH' | 'GAME_ACTION' | 'PLAYER_DISCONNECTED' | 'PLAYER_RECONNECTED' | 'FORFEIT_WIN';
   fromUid?: string;
   fromName?: string;
   toUid?: string;
@@ -18,11 +18,17 @@ export interface ChallengeMessage {
   users?: OnlineUser[];
   firstTurnColor?: string;
   mapSeed?: number;
-  yourColor?: string;       // Server directly tells this player their color
+  yourColor?: string;
   opponentColor?: string;
   // For GAME_ACTION
   kind?: string;
   actions?: Array<{ unitId: string; action: object }>;
+  nextTurnOwner?: string;
+  // For Disconnect/Reconnect
+  disconnectedUid?: string;
+  gracePeriodSec?: number;
+  winnerUid?: string;
+  reason?: string;
 }
 
 export class LobbyManager {
@@ -34,6 +40,8 @@ export class LobbyManager {
   private onMatchStartCallback?: (roomId: string, assignedColor: string, firstTurnColor: string, mapSeed: number) => void;
   private onSurrenderCallback?: (surrenderUid: string) => void;
   private onGameActionCallback?: (action: ChallengeMessage) => void;
+  private onPlayerDisconnectedCallback?: (disconnectedUid: string, gracePeriodSec: number) => void;
+  private onForfeitWinCallback?: (winnerUid: string, reason: string) => void;
 
   constructor() {}
 
@@ -125,6 +133,18 @@ export class LobbyManager {
         }
         break;
 
+      case 'PLAYER_DISCONNECTED':
+        if (msg.disconnectedUid && this.onPlayerDisconnectedCallback) {
+          this.onPlayerDisconnectedCallback(msg.disconnectedUid, msg.gracePeriodSec || 30);
+        }
+        break;
+
+      case 'FORFEIT_WIN':
+        if (msg.winnerUid && this.onForfeitWinCallback) {
+          this.onForfeitWinCallback(msg.winnerUid, msg.reason || '');
+        }
+        break;
+
       case 'SURRENDER_MATCH':
         if (msg.fromUid && this.onSurrenderCallback) {
           this.onSurrenderCallback(msg.fromUid);
@@ -192,6 +212,14 @@ export class LobbyManager {
 
   public onGameAction(cb: (action: ChallengeMessage) => void): void {
     this.onGameActionCallback = cb;
+  }
+
+  public onPlayerDisconnected(cb: (disconnectedUid: string, gracePeriodSec: number) => void): void {
+    this.onPlayerDisconnectedCallback = cb;
+  }
+
+  public onForfeitWin(cb: (winnerUid: string, reason: string) => void): void {
+    this.onForfeitWinCallback = cb;
   }
 
   private renderLobbyUI(): void {

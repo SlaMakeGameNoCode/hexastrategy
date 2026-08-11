@@ -102,7 +102,11 @@ wss.on('connection', (ws) => {
               activeRooms.set(roomId, {
                 player1Uid: data.toUid,
                 player2Uid: data.fromUid,
-                mapSeed
+                mapSeed,
+                currentTurnOwner: '#3B82F6', // Blue (player 1) goes first
+                roundCount: 1,
+                status: 'PLAYING',
+                disconnectTimer: null
               });
 
               // IMPORTANT: Send DIFFERENT yourColor to each player
@@ -147,6 +151,14 @@ wss.on('connection', (ws) => {
             const room = activeRooms.get(data.roomId);
             const opponentUid = room.player1Uid === data.fromUid ? room.player2Uid : room.player1Uid;
             const opponentClient = connectedClients.get(opponentUid);
+            
+            if (data.kind === 'END_TURN') {
+              // Switch turn to opponent
+              room.currentTurnOwner = room.currentTurnOwner === '#3B82F6' ? '#EF4444' : '#3B82F6';
+              data.nextTurnOwner = room.currentTurnOwner;
+            }
+
+            // Relay action to opponent
             if (opponentClient && opponentClient.ws.readyState === WebSocket.OPEN) {
               opponentClient.ws.send(JSON.stringify(data));
             }
@@ -181,6 +193,39 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     if (clientUid) {
+      // Check if client was in an active room
+      for (const [roomId, room] of activeRooms.entries()) {
+        if (room.player1Uid === clientUid || room.player2Uid === clientUid) {
+          const opponentUid = room.player1Uid === clientUid ? room.player2Uid : room.player1Uid;
+          const opponentClient = connectedClients.get(opponentUid);
+
+          // Notify opponent that player disconnected with 30s grace period
+          if (opponentClient && opponentClient.ws.readyState === WebSocket.OPEN) {
+            opponentClient.ws.send(JSON.stringify({
+              type: 'PLAYER_DISCONNECTED',
+              disconnectedUid: clientUid,
+              gracePeriodSec: 30
+            }));
+          }
+
+          // Start 30s disconnect timeout before awarding forfeit win
+          if (!room.disconnectTimer) {
+            room.disconnectTimer = setTimeout(() => {
+              if (activeRooms.has(roomId)) {
+                if (opponentClient && opponentClient.ws.readyState === WebSocket.OPEN) {
+                  opponentClient.ws.send(JSON.stringify({
+                    type: 'FORFEIT_WIN',
+                    winnerUid: opponentUid,
+                    reason: 'Opponent disconnected for more than 30 seconds'
+                  }));
+                }
+                activeRooms.delete(roomId);
+              }
+            }, 30000);
+          }
+        }
+      }
+
       connectedClients.delete(clientUid);
       broadcastLobbyState();
     }
