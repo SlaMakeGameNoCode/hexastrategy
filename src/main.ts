@@ -26,18 +26,24 @@ window.addEventListener('DOMContentLoaded', () => {
   const mapTiles: MapTileRenderData[] = [];
   const tileMap = new Map<string, MapHexTile>();
 
+  /**
+   * Procedurally generates a randomized terrain map following strict Game Design Rules:
+   * - Forest: Clusters of >= 3 adjacent tiles (Capped <= 40% area)
+   * - Mountains: Capped <= 25% area, guaranteed open solvability path from Player to Enemy
+   * - High Ground, Ruins, Water, & Winding Road Highways
+   */
   function generateProceduralMap() {
     mapTiles.length = 0;
     tileMap.clear();
 
     const totalHexes = 15 * 13;
-    const maxForest = Math.floor(totalHexes * 0.35);
-    const maxMountain = Math.floor(totalHexes * 0.20);
+    const maxForest = Math.floor(totalHexes * 0.38);
+    const maxMountain = Math.floor(totalHexes * 0.22);
 
     let forestCount = 0;
     let mountainCount = 0;
 
-    // 1. Initialize Ground Grid
+    // 1. Initialize Base Ground Grid
     for (let r = -6; r <= 6; r++) {
       for (let col = -7; col <= 7; col++) {
         const q = col - Math.floor(r / 2);
@@ -48,26 +54,21 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // 2. Generate Road Highway connecting South to North
-    for (let r = -6; r <= 6; r++) {
-      const col = Math.round(Math.sin(r * 0.5) * 2);
-      const q = col - Math.floor(r / 2);
-      const key = `${q},${r}`;
-      const tile = tileMap.get(key);
-      if (tile) tile.terrain = 'ROAD';
-    }
+    // 2. Randomized Biome Archetype Selection (0: Forest Heavy, 1: Mountain Pass, 2: Highland, 3: Ruins Citadel)
+    const biomeType = Math.floor(Math.random() * 4);
 
-    // 3. Generate Forest Clusters (Min 3 adjacent hexes per cluster, total <= 35%)
-    const forestSeeds = [
-      { col: -4, r: -3 }, { col: 4, r: 3 }, { col: -3, r: 2 }, { col: 3, r: -2 }
-    ];
+    // 3. Generate Forest Clusters (Min 3 adjacent tiles per cluster)
+    const numForestSeeds = biomeType === 0 ? 6 : Math.floor(Math.random() * 3) + 4;
+    for (let s = 0; s < numForestSeeds; s++) {
+      if (forestCount >= maxForest) break;
+      const randCol = Math.floor(Math.random() * 10) - 5; // col from -5 to 4
+      const randR = Math.floor(Math.random() * 8) - 4;   // r from -4 to 3
+      const randQ = randCol - Math.floor(randR / 2);
+      const seedHex: HexCoord = { q: randQ, r: randR };
 
-    for (const seed of forestSeeds) {
-      const qSeed = seed.col - Math.floor(seed.r / 2);
-      const seedHex: HexCoord = { q: qSeed, r: seed.r };
-      const clusterHexes = [seedHex, ...HexMath.getNeighbors(seedHex)];
-
-      for (const hex of clusterHexes) {
+      // Forest cluster (seed + adjacent neighbors = >= 3 tiles)
+      const cluster = [seedHex, ...HexMath.getNeighbors(seedHex)];
+      for (const hex of cluster) {
         if (forestCount >= maxForest) break;
         const key = HexPathfinder.hexKey(hex);
         const tile = tileMap.get(key);
@@ -78,11 +79,74 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // 4. Generate Mountain Barriers (Capped <= 20%)
+    // 4. Generate High Ground Plateaus
+    const numHighSeeds = biomeType === 2 ? 5 : Math.floor(Math.random() * 3) + 2;
+    for (let s = 0; s < numHighSeeds; s++) {
+      const randCol = Math.floor(Math.random() * 8) - 4;
+      const randR = Math.floor(Math.random() * 6) - 3;
+      const randQ = randCol - Math.floor(randR / 2);
+      const seedHex: HexCoord = { q: randQ, r: randR };
+      const cluster = [seedHex, ...HexMath.getNeighbors(seedHex).slice(0, 3)];
+
+      for (const hex of cluster) {
+        const key = HexPathfinder.hexKey(hex);
+        const tile = tileMap.get(key);
+        if (tile && tile.terrain === 'GROUND') {
+          tile.terrain = 'HIGH_GROUND';
+        }
+      }
+    }
+
+    // 5. Generate Ancient Ruins
+    const numRuinsSeeds = biomeType === 3 ? 5 : Math.floor(Math.random() * 3) + 2;
+    for (let s = 0; s < numRuinsSeeds; s++) {
+      const randCol = Math.floor(Math.random() * 8) - 4;
+      const randR = Math.floor(Math.random() * 6) - 3;
+      const randQ = randCol - Math.floor(randR / 2);
+      const seedHex: HexCoord = { q: randQ, r: randR };
+
+      const key = HexPathfinder.hexKey(seedHex);
+      const tile = tileMap.get(key);
+      if (tile && tile.terrain === 'GROUND') {
+        tile.terrain = 'RUINS';
+      }
+    }
+
+    // 6. Generate Water Streams
+    const numWaterSeeds = Math.floor(Math.random() * 2) + 1;
+    for (let s = 0; s < numWaterSeeds; s++) {
+      const randCol = Math.floor(Math.random() * 8) - 4;
+      const randR = Math.floor(Math.random() * 6) - 3;
+      const randQ = randCol - Math.floor(randR / 2);
+      const seedHex: HexCoord = { q: randQ, r: randR };
+      const cluster = [seedHex, ...HexMath.getNeighbors(seedHex).slice(0, 2)];
+
+      for (const hex of cluster) {
+        const key = HexPathfinder.hexKey(hex);
+        const tile = tileMap.get(key);
+        if (tile && tile.terrain === 'GROUND') {
+          tile.terrain = 'WATER';
+        }
+      }
+    }
+
+    // 7. Generate Winding Road Highway
+    const roadSinePhase = Math.random() * Math.PI * 2;
+    for (let r = -6; r <= 6; r++) {
+      const col = Math.round(Math.sin(r * 0.5 + roadSinePhase) * 3);
+      const q = col - Math.floor(r / 2);
+      const key = `${q},${r}`;
+      const tile = tileMap.get(key);
+      if (tile && tile.terrain !== 'HIGH_GROUND') {
+        tile.terrain = 'ROAD';
+      }
+    }
+
+    // 8. Generate Mountain Barriers (Capped <= 22%)
     for (let r = -6; r <= 6; r++) {
       if (mountainCount >= maxMountain) break;
 
-      // Left & Right mountain borders
+      // Flank Mountain Boundaries
       const leftQ = -7 - Math.floor(r / 2);
       const rightQ = 7 - Math.floor(r / 2);
 
@@ -92,8 +156,9 @@ window.addEventListener('DOMContentLoaded', () => {
       const rightTile = tileMap.get(`${rightQ},${r}`);
       if (rightTile) { rightTile.terrain = 'MOUNTAIN'; mountainCount++; }
 
-      if (r === -2 || r === 2) {
-        const midQ = -3 - Math.floor(r / 2);
+      if (biomeType === 1 && (r === -2 || r === 2)) {
+        const midCol = Math.floor(Math.random() * 4) - 2;
+        const midQ = midCol - Math.floor(r / 2);
         const midTile = tileMap.get(`${midQ},${r}`);
         if (midTile && midTile.terrain === 'GROUND') {
           midTile.terrain = 'MOUNTAIN';
@@ -102,32 +167,14 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // 5. Generate High Ground Plateaus & Ruins
-    for (let col = -3; col <= 3; col++) {
-      const q1 = col - Math.floor(-4 / 2);
-      const tile1 = tileMap.get(`${q1},-4`);
-      if (tile1 && tile1.terrain === 'GROUND') tile1.terrain = 'HIGH_GROUND';
-
-      const q2 = col - Math.floor(4 / 2);
-      const tile2 = tileMap.get(`${q2},4`);
-      if (tile2 && tile2.terrain === 'GROUND') tile2.terrain = 'HIGH_GROUND';
-    }
-
-    const ruinsSeeds = [{ col: -2, r: -1 }, { col: 2, r: 1 }, { col: 0, r: 0 }];
-    for (const rSeed of ruinsSeeds) {
-      const q = rSeed.col - Math.floor(rSeed.r / 2);
-      const tile = tileMap.get(`${q},${rSeed.r}`);
-      if (tile && tile.terrain === 'GROUND') tile.terrain = 'RUINS';
-    }
-
-    // 6. Solvability Verification (A* Path from Player start to Enemy start)
+    // 9. Solvability Verification (A* Path from Player team to Enemy team)
     const playerStart: HexCoord = { q: -1 - Math.floor(5 / 2), r: 5 };
     const enemyStart: HexCoord = { q: -1 - Math.floor(-5 / 2), r: -5 };
 
-    const testPath = HexPathfinder.findPath(playerStart, enemyStart, 999, 'INFANTRY', (coord) => tileMap.get(HexPathfinder.hexKey(coord)));
+    let testPath = HexPathfinder.findPath(playerStart, enemyStart, 999, 'INFANTRY', (coord) => tileMap.get(HexPathfinder.hexKey(coord)));
 
     if (!testPath) {
-      // Break a mountain pass path to guarantee solvability!
+      // Break mountain obstacles along central corridor to open a Mountain Pass path!
       for (let r = 5; r >= -5; r--) {
         const col = 0;
         const q = col - Math.floor(r / 2);
@@ -138,7 +185,7 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Update mapTiles render array
+    // Sync mapTiles array with tileMap state
     for (let i = 0; i < mapTiles.length; i++) {
       const key = HexPathfinder.hexKey(mapTiles[i].coord);
       const tile = tileMap.get(key);
@@ -763,7 +810,6 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     };
 
-    // Execute Team Turns according to AP Priority First Turn order!
     if (firstTurnOwnerColor === '#3B82F6') {
       await executeTeamTurn(playerUnits);
       await new Promise((r) => setTimeout(r, 400));
@@ -994,10 +1040,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (turnManager.getPhase() === 'DEPLOYMENT') {
       generateProceduralMap();
       renderer.cacheTerrain(mapTiles);
-      const deckDrawer = document.getElementById('deck-drawer');
-      if (deckDrawer) {
-        floatingTexts.push({ x: 0, y: -40, text: '🎲 ĐÃ SINH BẢN ĐỒ MỚI!', color: '#10B981', alpha: 1.0 });
-      }
+      floatingTexts.push({ x: 0, y: -40, text: '🎲 ĐÃ SINH BẢN ĐỒ MỚI!', color: '#10B981', alpha: 1.0 });
     }
   });
 
