@@ -31,23 +31,39 @@ export class CombatResolver {
     const attackerStats = ArmyRegistry.getStats(attackerClass);
     const defenderStats = ArmyRegistry.getStats(defenderClass);
 
-    // Charge vs Brace Counter Check
-    const isDefenderLongSpearBracing = (defenderClass === 'LONG_SPEAR' || defenderClass === 'SHORT_SPEAR') && isDefenderBracing;
-    const isAttackerCavalryCharging = attackerStats.category === 'CAVALRY' && isAttackerCharging;
+    // Spear Phalanx / Brace Counter Check against Cavalry
+    const isDefenderSpear = defenderClass === 'LONG_SPEAR' || defenderClass === 'SHORT_SPEAR';
+    const isAttackerCavalry = attackerStats.category === 'CAVALRY';
 
-    if (isAttackerCavalryCharging && isDefenderLongSpearBracing) {
-      // Brace counter-reaction triggers first; Charge bonus/knockback canceled
-      const counterMult = 2.0; // Brace counter penalty to cavalry
-      const rawDamage = Math.max(1, defenderStats.attack - attackerStats.defense);
-      const finalDamage = Math.round(rawDamage * counterMult * terrainModifier);
+    if (isDefenderSpear && isDefenderBracing) {
+      if (isAttackerCavalry) {
+        // Spear Wall / Brace triggers 2.0x counter damage against Cavalry!
+        const counterMult = 2.0;
+        const rawDamage = Math.max(1, defenderStats.attack - attackerStats.defense);
+        const finalDamage = Math.round(rawDamage * counterMult * terrainModifier);
 
-      return {
-        rawDamage,
-        finalDamage,
-        isCounter: true,
-        isBraceCounterTriggered: true,
-        isChargeCanceled: true
-      };
+        return {
+          rawDamage,
+          finalDamage,
+          isCounter: true,
+          isBraceCounterTriggered: true,
+          isChargeCanceled: true
+        };
+      } else {
+        // Spear Wall reduces incoming DMG from non-cavalry by 50%
+        let counterMult = ArmyRegistry.getCounterMultiplier(attackerClass, defenderClass);
+        const armorFactor = 100 / (100 + defenderStats.defense);
+        const rawDamage = Math.max(1, attackerStats.attack * armorFactor * 0.5);
+        const finalDamage = Math.max(1, Math.round(rawDamage * counterMult * terrainModifier));
+
+        return {
+          rawDamage,
+          finalDamage,
+          isCounter: false,
+          isBraceCounterTriggered: false,
+          isChargeCanceled: false
+        };
+      }
     }
 
     // Standard Combat Damage calculation
@@ -80,13 +96,13 @@ export class CombatResolver {
       let priorityA = statsA.initiative;
       let priorityB = statsB.initiative;
 
-      if (a.type === 'BRACE') priorityA += 10; // Brace defensive priority boost
+      if (a.type === 'BRACE') priorityA += 10;
       if (b.type === 'BRACE') priorityB += 10;
 
-      if (a.type === 'CHARGE') priorityA += 5; // Charge priority boost
+      if (a.type === 'CHARGE') priorityA += 5;
       if (b.type === 'CHARGE') priorityB += 5;
 
-      return priorityB - priorityA; // Higher initiative first
+      return priorityB - priorityA;
     });
   }
 }

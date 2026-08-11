@@ -61,6 +61,13 @@ window.addEventListener('DOMContentLoaded', () => {
     { id: 'u_enemy_3', name: 'Enemy Spear', armyClass: 'SHORT_SPEAR', category: 'INFANTRY', position: { q: 0, r: -5 }, hp: 100, maxHp: 100, ownerColor: '#EF4444', hasActedThisRound: false }
   ];
 
+  function isUnitBracingOrSpearWall(unit: RenderableUnit): boolean {
+    if (!unit.assignedAction) return false;
+    if (unit.assignedAction.type === 'BRACE') return true;
+    if (unit.assignedAction.type === 'SKILL' && unit.assignedAction.skillType === 'SPEAR_WALL') return true;
+    return false;
+  }
+
   function updateInspectorPanel(armyClass: ArmyClassId) {
     const stats = ArmyRegistry.getStats(armyClass);
     const iconEl = document.getElementById('info-unit-icon');
@@ -158,7 +165,6 @@ window.addEventListener('DOMContentLoaded', () => {
       const skillDef = SkillResolver.getSkillDefinition(skillType);
 
       if (btnSkill) {
-        // IF UNIT HAS ALREADY ASSIGNED AN ACTION -> Show Cancel Action Option!
         if (unit.hasActedThisRound && unit.assignedAction) {
           const actName = unit.assignedAction.type === 'SKILL' ? skillDef.name : unit.assignedAction.type;
           btnSkill.innerText = `✖️ Hủy Lệnh ${actName} (Hoàn +${unit.assignedAction.cost} AP)`;
@@ -438,7 +444,23 @@ window.addEventListener('DOMContentLoaded', () => {
             u.isMoving = false;
             updateTileOccupancy();
 
-            if (targetUnit && targetUnit.id !== u.id) {
+            // CHECK IF TARGET IS SPEAR WITH BRACE / SPEAR WALL ACTIVE!
+            const isTargetBracing = targetUnit ? isUnitBracingOrSpearWall(targetUnit) : false;
+
+            if (targetUnit && isTargetBracing) {
+              // SPEAR WALL INTERCEPTS CAVALRY CHARGE!
+              const defenderClass = (targetUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId;
+              const dmgResult = CombatResolver.calculateDamage(attackerClass, defenderClass, true, true);
+
+              u.hp = Math.max(0, u.hp - dmgResult.finalDamage);
+              const cavPos = HexMath.hexToPixel(u.position, renderer.getHexRadius());
+              floatingTexts.push({ x: cavPos.x, y: cavPos.y - 30, text: `-${dmgResult.finalDamage} SPEAR WALL COUNTER!`, color: '#F59E0B', alpha: 1.0 });
+
+              const spearPos = HexMath.hexToPixel(targetUnit.position, renderer.getHexRadius());
+              renderer.getVFXManager().spawnDiamondPhalanxBarrier(spearPos.x, spearPos.y);
+              renderer.getVFXManager().spawnExplosion(cavPos.x, cavPos.y, '#F59E0B', 30);
+              renderer.triggerScreenShake(14, 400);
+            } else if (targetUnit && targetUnit.id !== u.id) {
               const skillRes = SkillResolver.executeSkill(attackerClass, sType, u.position, action.targetHex, ArmyRegistry.getStats((targetUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId).defense);
               targetUnit.hp = Math.max(0, targetUnit.hp - skillRes.primaryDamage);
               const pos = HexMath.hexToPixel(targetUnit.position, renderer.getHexRadius());
@@ -503,15 +525,17 @@ window.addEventListener('DOMContentLoaded', () => {
             }
 
             const defenderClass = (targetUnit.armyClass || 'SHORT_SPEAR') as ArmyClassId;
-            const isBrace = targetUnit.assignedAction?.type === 'BRACE';
+            const isBrace = isUnitBracingOrSpearWall(targetUnit);
             const isCharge = u.category === 'CAVALRY';
             const dmgResult = CombatResolver.calculateDamage(attackerClass, defenderClass, isCharge, isBrace);
 
             if (dmgResult.isBraceCounterTriggered) {
               u.hp = Math.max(0, u.hp - dmgResult.finalDamage);
               const pos = HexMath.hexToPixel(u.position, renderer.getHexRadius());
-              floatingTexts.push({ x: pos.x, y: pos.y - 30, text: `-${dmgResult.finalDamage} COUNTER!`, color: '#F59E0B', alpha: 1.0 });
-              renderer.triggerScreenShake(10, 300);
+              floatingTexts.push({ x: pos.x, y: pos.y - 30, text: `-${dmgResult.finalDamage} SPEAR WALL COUNTER!`, color: '#F59E0B', alpha: 1.0 });
+              const spearPos = HexMath.hexToPixel(targetUnit.position, renderer.getHexRadius());
+              renderer.getVFXManager().spawnDiamondPhalanxBarrier(spearPos.x, spearPos.y);
+              renderer.triggerScreenShake(12, 350);
             } else {
               targetUnit.hp = Math.max(0, targetUnit.hp - dmgResult.finalDamage);
               const pos = HexMath.hexToPixel(targetUnit.position, renderer.getHexRadius());
