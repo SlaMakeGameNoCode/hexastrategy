@@ -15,9 +15,10 @@ describe('TerrainMatrix Unit Tests', () => {
     expect(TerrainMatrix.getMovementCost('GROUND', 'INFANTRY')).toBe(1);
   });
 
-  it('test_mountain_and_water_are_impassable', () => {
+  it('test_mountain_and_water_costs', () => {
     expect(TerrainMatrix.isImpassable('MOUNTAIN', 'INFANTRY')).toBe(true);
-    expect(TerrainMatrix.isImpassable('WATER', 'CAVALRY')).toBe(true);
+    expect(TerrainMatrix.getMovementCost('WATER', 'CAVALRY')).toBe(3);
     expect(TerrainMatrix.getMovementCost('MOUNTAIN', 'ARCHER')).toBe(Infinity);
   });
+
 });

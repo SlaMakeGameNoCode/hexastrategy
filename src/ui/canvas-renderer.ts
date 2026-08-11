@@ -8,18 +8,19 @@ export interface RenderableUnit {
   armyClass?: string;
   category: 'INFANTRY' | 'CAVALRY' | 'ARCHER';
   position: HexCoord;
-  animPos?: { x: number; y: number }; // Smooth interpolated pixel position
+  animPos?: { x: number; y: number };
   isMoving?: boolean;
   attackAnim?: {
     type: 'MELEE_SLASH' | 'SPEAR_THRUST' | 'ARROW_SHOOT';
     targetX: number;
     targetY: number;
-    progress: number; // 0.0 to 1.0
+    progress: number;
   };
   hp: number;
   maxHp: number;
   ownerColor: string;
   hasActedThisRound?: boolean;
+  isStealthed?: boolean;
   assignedAction?: {
     type: 'MOVE' | 'ATTACK' | 'BRACE' | 'SKILL';
     targetHex?: HexCoord;
@@ -81,7 +82,6 @@ export class Canvas2DRenderer {
     return this.vfxManager;
   }
 
-
   public setupDPI(): void {
     const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
     if (this.canvas && typeof this.canvas.getBoundingClientRect === 'function') {
@@ -93,7 +93,7 @@ export class Canvas2DRenderer {
           this.canvas.width = rect.width * dpr;
           this.canvas.height = rect.height * dpr;
           this.ctx.scale(dpr, dpr);
-          this.offscreenCanvas = null; // Re-cache on size change
+          this.offscreenCanvas = null;
         }
       }
     }
@@ -158,14 +158,14 @@ export class Canvas2DRenderer {
     highlightHexes?: Map<string, number>,
     pathPreview?: HexCoord[],
     floatingTexts?: FloatingText[],
-    deployZoneHexes?: HexCoord[]
+    deployZoneHexes?: HexCoord[],
+    visibleHexes?: Set<string>
   ): void {
     this.setupDPI();
 
     const width = this.logicalWidth;
     const height = this.logicalHeight;
 
-    // Apply Screen Shake offset if active
     let shakeX = 0;
     let shakeY = 0;
     if (this.cameraShakeMs > 0) {
@@ -185,6 +185,24 @@ export class Canvas2DRenderer {
     }
     if (this.offscreenCanvas) {
       this.ctx.drawImage(this.offscreenCanvas, shakeX, shakeY, width, height);
+    }
+
+    // Fog of War Overlay
+    if (visibleHexes) {
+      for (const tile of tiles) {
+        const hexKey = `${tile.coord.q},${tile.coord.r}`;
+        if (!visibleHexes.has(hexKey)) {
+          const pos = HexMath.hexToPixel(tile.coord, this.hexRadius);
+          this.drawHexagon(
+            this.ctx,
+            centerX + pos.x,
+            centerY + pos.y,
+            this.hexRadius,
+            'rgba(9, 13, 22, 0.72)',
+            '#0F172A'
+          );
+        }
+      }
     }
 
     // Highlight Deployment Zone (Pre-Battle Deployment Phase)
@@ -220,14 +238,22 @@ export class Canvas2DRenderer {
       this.ctx.stroke();
       this.ctx.setLineDash([]);
 
-      // Destination Marker
       const destPos = HexMath.hexToPixel(pathPreview[pathPreview.length - 1], this.hexRadius);
       this.drawHexagon(this.ctx, centerX + destPos.x, centerY + destPos.y, this.hexRadius - 2, 'rgba(245, 158, 11, 0.4)', '#F59E0B');
     }
 
     // Render Units
     for (const unit of units) {
-      if (unit.hp <= 0) continue; // Hide dead units
+      if (unit.hp <= 0) continue;
+
+      const isBlue = unit.ownerColor === '#3B82F6';
+      const hexKey = `${unit.position.q},${unit.position.r}`;
+
+      // Fog of War / Stealth Visibility Check for Enemy Units
+      if (!isBlue) {
+        if (visibleHexes && !visibleHexes.has(hexKey)) continue; // Enemy hidden in Fog of War!
+        if (unit.isStealthed) continue; // Enemy hidden in Stealth!
+      }
 
       let px = centerX;
       let py = centerY;
@@ -242,7 +268,15 @@ export class Canvas2DRenderer {
       }
 
       const isSelected = selectedUnitId === unit.id;
+
+      this.ctx.save();
+      if (isBlue && unit.isStealthed) {
+        this.ctx.globalAlpha = 0.45; // Render stealthed friendly unit semi-transparent
+      }
+
       this.drawUnit(this.ctx, px, py, unit, isSelected);
+
+      this.ctx.restore();
 
       // Render Planned Action Target Indicator
       if (unit.assignedAction && unit.assignedAction.targetHex) {
@@ -266,27 +300,23 @@ export class Canvas2DRenderer {
         this.ctx.restore();
       }
     }
-
   }
 
   private drawUnit(ctx: CanvasRenderingContext2D, x: number, y: number, unit: RenderableUnit, isSelected: boolean): void {
     let drawX = x;
     let drawY = y;
 
-    // 1. Walk Cycle Animation (Bobbing / Hopping when moving)
     if (unit.isMoving) {
       const bob = Math.abs(Math.sin(Date.now() / 80)) * 6;
       drawY -= bob;
     }
 
-    // 2. Attack Lunge Animation & Projectile Effects
     if (unit.attackAnim) {
       const p = unit.attackAnim.progress;
       const dx = unit.attackAnim.targetX - x;
       const dy = unit.attackAnim.targetY - y;
 
       if (unit.attackAnim.type === 'ARROW_SHOOT') {
-        // Draw Flying Arrow Projectile from Unit to Target
         const arrowX = x + dx * p;
         const arrowY = y + dy * p;
         ctx.save();
@@ -298,7 +328,6 @@ export class Canvas2DRenderer {
         ctx.stroke();
         ctx.restore();
       } else {
-        // Melee Thrust / Charge Lunge forward & back
         const lunge = Math.sin(p * Math.PI) * 16;
         const dist = Math.hypot(dx, dy) || 1;
         drawX += (dx / dist) * lunge;
@@ -306,7 +335,6 @@ export class Canvas2DRenderer {
       }
     }
 
-    // Selection Ring Glow
     if (isSelected) {
       ctx.beginPath();
       ctx.arc(drawX, drawY, 26, 0, Math.PI * 2);
@@ -317,7 +345,6 @@ export class Canvas2DRenderer {
       ctx.stroke();
     }
 
-    // Detailed HD 2D Character Sprite & Weapon Rendering (High Visual Polish)
     const isActed = unit.hasActedThisRound;
     const isBlue = unit.ownerColor === '#3B82F6';
     const tunicColor = isActed ? '#64748B' : (isBlue ? '#2563EB' : '#DC2626');
@@ -327,7 +354,6 @@ export class Canvas2DRenderer {
 
     ctx.save();
 
-    // 1. Base Ground Shadow
     ctx.beginPath();
     ctx.ellipse(drawX, drawY + 12, 14, 6, 0, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
@@ -336,19 +362,15 @@ export class Canvas2DRenderer {
     const cls = unit.armyClass || unit.category;
 
     if (cls.includes('CAVALRY') || cls === 'HORSE_ARCHER') {
-      // --- HD 2D MOUNTED CAVALRY SPRITE ---
-      // Horse Body & Legs
       ctx.fillStyle = cls === 'HEAVY_CAVALRY' ? '#334155' : '#78350F';
       ctx.beginPath();
       ctx.ellipse(drawX, drawY + 4, 16, 10, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Horse Head & Neck
       ctx.beginPath();
       ctx.ellipse(drawX - 10, drawY - 4, 7, 10, -0.4, 0, Math.PI * 2);
       ctx.fill();
 
-      // Rider Torso & Head
       ctx.beginPath();
       ctx.arc(drawX + 2, drawY - 6, 8, 0, Math.PI * 2);
       ctx.fillStyle = tunicColor;
@@ -359,42 +381,11 @@ export class Canvas2DRenderer {
       ctx.fillStyle = skinColor;
       ctx.fill();
 
-      // Helmet
       ctx.beginPath();
       ctx.arc(drawX + 2, drawY - 17, 5, Math.PI, Math.PI * 2);
       ctx.fillStyle = isBlue ? '#1E40AF' : '#991B1B';
       ctx.fill();
-
-      // Mounted Bow for Horse Archer
-      if (cls === 'HORSE_ARCHER') {
-        const bx = drawX + 8;
-        const by = drawY - 12;
-        ctx.strokeStyle = '#B45309';
-        ctx.lineWidth = 2.2;
-        ctx.beginPath();
-        ctx.arc(bx, by, 9, -Math.PI * 0.45, Math.PI * 0.45);
-        ctx.stroke();
-
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        ctx.moveTo(bx + 9 * Math.cos(-Math.PI * 0.45), by + 9 * Math.sin(-Math.PI * 0.45));
-        ctx.lineTo(bx + 9 * Math.cos(Math.PI * 0.45), by + 9 * Math.sin(Math.PI * 0.45));
-        ctx.stroke();
-
-        ctx.strokeStyle = '#D97706';
-        ctx.lineWidth = 1.8;
-        ctx.beginPath();
-        ctx.moveTo(bx - 6, by);
-        ctx.lineTo(bx + 12, by);
-        ctx.stroke();
-      } else {
-        ctx.moveTo(drawX - 6, drawY - 10);
-        ctx.lineTo(drawX - 22, drawY - 16);
-        ctx.stroke();
-      }
     } else if (cls === 'CATAPULT') {
-      // --- HD 2D SIEGE CATAPULT SPRITE ---
       ctx.fillStyle = '#92400E';
       ctx.fillRect(drawX - 16, drawY - 2, 32, 12);
       ctx.fillStyle = '#451A03';
@@ -402,224 +393,29 @@ export class Canvas2DRenderer {
       ctx.arc(drawX - 10, drawY + 10, 5, 0, Math.PI * 2);
       ctx.arc(drawX + 10, drawY + 10, 5, 0, Math.PI * 2);
       ctx.fill();
-      // Arm
-      ctx.strokeStyle = '#D97706';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(drawX - 8, drawY + 4);
-      ctx.lineTo(drawX + 12, drawY - 16);
-      ctx.stroke();
     } else {
-      // --- HD 2D FOOT SOLDIER SPRITE ---
-      // Legs / Lower body
       ctx.fillStyle = '#1E293B';
       ctx.fillRect(drawX - 6, drawY + 4, 4, 10);
       ctx.fillRect(drawX + 2, drawY + 4, 4, 10);
 
-      // Torso & Tunic Armor
       ctx.beginPath();
       ctx.arc(drawX, drawY - 2, 9, 0, Math.PI * 2);
       ctx.fillStyle = tunicColor;
       ctx.fill();
 
-      // Head & Skin
       ctx.beginPath();
       ctx.arc(drawX, drawY - 14, 6, 0, Math.PI * 2);
       ctx.fillStyle = skinColor;
       ctx.fill();
 
-      // Helmet / Crest
       ctx.beginPath();
       ctx.arc(drawX, drawY - 16, 6, Math.PI, Math.PI * 2);
       ctx.fillStyle = isBlue ? '#1E40AF' : '#991B1B';
       ctx.fill();
-
-      // --- UNIQUE HD WEAPONS ---
-      ctx.strokeStyle = weaponColor;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-
-      if (cls === 'LONG_SPEAR') {
-        // Ultra-Long Pike (Brown Wooden Shaft starting from ground up past head + Silver Spearhead)
-        ctx.strokeStyle = '#78350F';
-        ctx.lineWidth = 3.0;
-        ctx.beginPath();
-        ctx.moveTo(drawX + 8, drawY + 12);
-        ctx.lineTo(drawX + 8, drawY - 36);
-        ctx.stroke();
-
-        // Metallic Spearhead Tip
-        ctx.fillStyle = '#E2E8F0';
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        ctx.moveTo(drawX + 8, drawY - 42);
-        ctx.lineTo(drawX + 12, drawY - 35);
-        ctx.lineTo(drawX + 4, drawY - 35);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-      } else if (cls === 'SHORT_SPEAR') {
-        // Short Spear (Brown Wooden Shaft + Triangular Spearhead)
-        ctx.strokeStyle = '#78350F';
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(drawX + 8, drawY + 10);
-        ctx.lineTo(drawX + 8, drawY - 22);
-        ctx.stroke();
-
-        // Distinct Triangular Spearhead Tip (Not a Sword)
-        ctx.fillStyle = '#F8FAFC';
-        ctx.beginPath();
-        ctx.moveTo(drawX + 8, drawY - 27);
-        ctx.lineTo(drawX + 11, drawY - 21);
-        ctx.lineTo(drawX + 5, drawY - 21);
-        ctx.closePath();
-        ctx.fill();
-      } else if (cls === 'SWORD_SHIELD') {
-        // Heavy Metal Round Shield
-        ctx.fillStyle = armorColor;
-        ctx.beginPath();
-        ctx.arc(drawX - 7, drawY - 2, 7, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.stroke();
-
-        // Short Sword Blade + Crossguard
-        ctx.strokeStyle = weaponColor;
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(drawX + 8, drawY + 6);
-        ctx.lineTo(drawX + 8, drawY - 14);
-        ctx.moveTo(drawX + 5, drawY - 4);
-        ctx.lineTo(drawX + 11, drawY - 4);
-        ctx.stroke();
-      } else if (cls === 'GREATSWORD') {
-        // Massive Two-Handed Greatsword
-        ctx.strokeStyle = weaponColor;
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(drawX + 7, drawY + 8);
-        ctx.lineTo(drawX + 7, drawY - 26);
-        ctx.moveTo(drawX + 3, drawY - 6);
-        ctx.lineTo(drawX + 11, drawY - 6);
-        ctx.stroke();
-      } else if (cls.includes('CROSSBOW')) {
-        // --- HD PIXEL-EXACT CROSSBOW SPRITE (Matching User Reference Image) ---
-        const isHeavy = cls === 'HEAVY_CROSSBOW';
-        const cx = drawX + 4;
-        const cy = drawY - 6;
-
-        // 1. Curved Wooden Stock & Pistol Grip (Matching Ref Image Brown Wood Stock)
-        ctx.fillStyle = '#78350F';
-        ctx.strokeStyle = '#451A03';
-        ctx.lineWidth = 1.0;
-
-        ctx.beginPath();
-        // Main Stock Body & Stock Tail Curve Down
-        ctx.moveTo(cx - 14, cy + 8);
-        ctx.quadraticCurveTo(cx - 10, cy, cx - 2, cy - 2);
-        ctx.lineTo(cx + 10, cy - 2);
-        ctx.lineTo(cx + 12, cy + 3);
-        ctx.lineTo(cx - 2, cy + 3);
-        ctx.quadraticCurveTo(cx - 8, cy + 5, cx - 12, cy + 12);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-
-        // 2. Large Vertical Metal Bow Limbs (Front Curved Steel Prod - Light Blue Metal)
-        ctx.strokeStyle = '#93C5FD';
-        ctx.lineWidth = isHeavy ? 3.5 : 2.5;
-        ctx.beginPath();
-        const frontX = cx + 8;
-        // Top Limb curving backward
-        ctx.moveTo(frontX, cy);
-        ctx.quadraticCurveTo(frontX + 6, cy - 10, frontX - 2, cy - 16);
-        // Bottom Limb curving backward
-        ctx.moveTo(frontX, cy);
-        ctx.quadraticCurveTo(frontX + 6, cy + 10, frontX - 2, cy + 16);
-        ctx.stroke();
-
-        // Limb Reinforcement Caps
-        ctx.fillStyle = '#1E3A8A';
-        ctx.fillRect(frontX - 4, cy - 18, 4, 4);
-        ctx.fillRect(frontX - 4, cy + 14, 4, 4);
-
-        // 3. Taut Black/Dark Steel Bowstring (Pulled back to trigger)
-        ctx.strokeStyle = '#1E293B';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(frontX - 2, cy - 16);
-        ctx.lineTo(cx - 2, cy);
-        ctx.lineTo(frontX - 2, cy + 16);
-        ctx.stroke();
-
-        // 4. Short Heavy Steel Bolt Quarrel (With Steel Arrowhead)
-        ctx.strokeStyle = '#CBD5E1';
-        ctx.lineWidth = 2.0;
-        ctx.beginPath();
-        ctx.moveTo(cx - 2, cy);
-        ctx.lineTo(frontX + 6, cy);
-        ctx.stroke();
-
-        // Triangular Steel Bolt Tip
-        ctx.fillStyle = '#0284C7';
-        ctx.beginPath();
-        ctx.moveTo(frontX + 10, cy);
-        ctx.lineTo(frontX + 5, cy - 3);
-        ctx.lineTo(frontX + 5, cy + 3);
-        ctx.closePath();
-        ctx.fill();
-      } else if (cls.includes('BOW')) {
-        // --- REALISTIC HD BOW & ARROW DRAWING ---
-        const isLong = cls === 'LONGBOW';
-        const bowRadius = isLong ? 13 : 9; // Longbow staff is larger
-        const bx = drawX + 6;
-        const by = drawY - 8;
-
-        // 1. Curved Wooden Bow Staff (Brown Wood)
-        ctx.strokeStyle = '#B45309';
-        ctx.lineWidth = isLong ? 3.0 : 2.2;
-        ctx.beginPath();
-        ctx.arc(bx, by, bowRadius, -Math.PI * 0.45, Math.PI * 0.45);
-        ctx.stroke();
-
-        // 2. Taut Bowstring (Fine White Line)
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        ctx.moveTo(bx + bowRadius * Math.cos(-Math.PI * 0.45), by + bowRadius * Math.sin(-Math.PI * 0.45));
-        ctx.lineTo(bx + bowRadius * Math.cos(Math.PI * 0.45), by + bowRadius * Math.sin(Math.PI * 0.45));
-        ctx.stroke();
-
-        // 3. Nocked Arrow (Wood Shaft + Arrowhead)
-        ctx.strokeStyle = '#D97706';
-        ctx.lineWidth = 1.8;
-        ctx.beginPath();
-        ctx.moveTo(bx - 8, by);
-        ctx.lineTo(bx + bowRadius + 4, by);
-        ctx.stroke();
-
-        // Metallic Arrowhead Tip
-        ctx.fillStyle = '#F8FAFC';
-        ctx.beginPath();
-        ctx.moveTo(bx + bowRadius + 8, by);
-        ctx.lineTo(bx + bowRadius + 3, by - 3);
-        ctx.lineTo(bx + bowRadius + 3, by + 3);
-        ctx.fill();
-
-        // Quiver Arrow Pouch on Back
-        ctx.fillStyle = '#78350F';
-        ctx.fillRect(drawX - 8, drawY - 14, 4, 12);
-      } else {
-        ctx.moveTo(drawX + 7, drawY + 8);
-        ctx.lineTo(drawX + 7, drawY - 16);
-      }
-      ctx.stroke();
     }
     ctx.restore();
 
-    // 2. Floating Circular Unit Icon Badge above Squad (Civ VI Style Flag - Positioned drawY - 48)
+    // Floating Circular Unit Icon Badge (Positioned drawY - 48)
     const flagY = drawY - 48;
     ctx.save();
     ctx.beginPath();
@@ -630,16 +426,17 @@ export class Canvas2DRenderer {
     ctx.lineWidth = 2.5;
     ctx.stroke();
 
-    // Icon Inside Floating Badge
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 12px Outfit, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const icon = this.getArmyIcon(unit.armyClass || unit.category);
+
+    // Show Stealth 🥷 badge if stealthed!
+    const icon = unit.isStealthed ? '🥷' : this.getArmyIcon(unit.armyClass || unit.category);
     ctx.fillText(icon, drawX, flagY);
     ctx.restore();
 
-    // 3. Health Bar Positioned Cleanly ABOVE Flag Badge (drawY - 68)
+    // Health Bar (drawY - 68)
     const barW = 34;
     const barH = 5;
     const hpRatio = Math.max(0, unit.hp / unit.maxHp);
@@ -652,25 +449,6 @@ export class Canvas2DRenderer {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
     ctx.lineWidth = 1;
     ctx.strokeRect(drawX - barW / 2, barY, barW, barH);
-
-    // Action Badge / Done Badge
-    if (unit.hasActedThisRound) {
-      ctx.beginPath();
-      ctx.arc(drawX + 15, flagY - 2, 7, 0, Math.PI * 2);
-      ctx.fillStyle = '#64748B';
-      ctx.fill();
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 8px Outfit, sans-serif';
-      ctx.fillText('✓', drawX + 15, flagY - 2);
-    } else if (unit.assignedAction) {
-      ctx.beginPath();
-      ctx.arc(drawX + 15, flagY - 2, 7, 0, Math.PI * 2);
-      ctx.fillStyle = '#F59E0B';
-      ctx.fill();
-      ctx.fillStyle = '#0F172A';
-      ctx.font = 'bold 8px Outfit, sans-serif';
-      ctx.fillText(unit.assignedAction.cost.toString(), drawX + 15, flagY - 2);
-    }
   }
 
   private getArmyIcon(armyClassOrCategory?: string): string {
