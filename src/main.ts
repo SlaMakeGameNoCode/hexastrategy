@@ -145,13 +145,12 @@ window.addEventListener('DOMContentLoaded', () => {
     pvpMyActionsSubmitted = false;
     pvpOpponentActionsBuffer = null;
 
-    // Generate map with shared seed so both clients get identical map
+    // Generate map & units with shared seed so both clients get identical map and units
     _mapSeed = mapSeed;
     generateProceduralMap();
-    _mapSeed = null;
-
     units.length = 0;
     units.push(...createDefaultUnits());
+    _mapSeed = null;
     renderer.cacheTerrain(mapTiles, pvpMode && myPvpColor === '#EF4444');
     updateTileOccupancy();
 
@@ -466,7 +465,7 @@ window.addEventListener('DOMContentLoaded', () => {
     playerRoster.forEach((item, idx) => {
       const stats = ArmyRegistry.getStats(item.classId);
       result.push({
-        id: `u_player_${idx}_${Date.now()}`,
+        id: `u_player_${idx}`,
         name: stats.name,
         armyClass: stats.id,
         category: stats.category,
@@ -478,15 +477,15 @@ window.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    // Enemy Units
+    // Enemy Units (use seeded rng() so both clients generate identical units!)
     enemyRosterPositions.forEach((pos, idx) => {
       const isMelee = idx < 4;
       const pool = isMelee ? enemyMeleePool : enemyRangedPool;
-      const randClass = pool[Math.floor(Math.random() * pool.length)];
+      const randClass = pool[Math.floor(rng() * pool.length)];
       const stats = ArmyRegistry.getStats(randClass);
 
       result.push({
-        id: `u_enemy_${idx}_${Date.now()}`,
+        id: `u_enemy_${idx}`,
         name: stats.name,
         armyClass: stats.id,
         category: stats.category,
