@@ -89,35 +89,34 @@ window.addEventListener('DOMContentLoaded', () => {
     isAuthRegisterTab = false;
     document.getElementById('tab-login')?.classList.add('primary');
     document.getElementById('tab-register')?.classList.remove('primary');
-    const nameInput = document.getElementById('auth-name');
-    if (nameInput) nameInput.style.display = 'none';
+    const submitBtn = document.getElementById('btn-auth-submit');
+    if (submitBtn) submitBtn.innerText = '🚀 Xác Nhận Đăng Nhập';
   });
 
   document.getElementById('tab-register')?.addEventListener('click', () => {
     isAuthRegisterTab = true;
     document.getElementById('tab-register')?.classList.add('primary');
     document.getElementById('tab-login')?.classList.remove('primary');
-    const nameInput = document.getElementById('auth-name');
-    if (nameInput) nameInput.style.display = 'block';
+    const submitBtn = document.getElementById('btn-auth-submit');
+    if (submitBtn) submitBtn.innerText = '📝 Xác Nhận Đăng Ký';
   });
 
   document.getElementById('btn-auth-submit')?.addEventListener('click', async () => {
-    const email = (document.getElementById('auth-email') as HTMLInputElement).value;
+    const username = (document.getElementById('auth-username') as HTMLInputElement).value;
     const pass = (document.getElementById('auth-pass') as HTMLInputElement).value;
-    const name = (document.getElementById('auth-name') as HTMLInputElement).value;
 
-    if (!email || !pass) {
-      alert('Vui lòng nhập đầy đủ Email và Mật khẩu!');
+    if (!username || !pass) {
+      alert('Vui lòng nhập đầy đủ Tên tài khoản và Mật khẩu!');
       return;
     }
 
     try {
       if (isAuthRegisterTab) {
-        await AuthService.register(email, pass, name);
-        alert('🎉 Đăng ký tài khoản thành công!');
+        await AuthService.registerWithUsername(username, pass);
+        alert(`🎉 Đăng ký tài khoản "${username}" thành công trên Firebase!`);
       } else {
-        await AuthService.login(email, pass);
-        alert('✅ Đăng nhập thành công!');
+        await AuthService.loginWithUsername(username, pass);
+        alert(`✅ Đăng nhập thành công với tài khoản "${username}"!`);
       }
       if (authModal) authModal.style.display = 'none';
     } catch (e: any) {

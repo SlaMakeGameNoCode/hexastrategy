@@ -17,6 +17,7 @@ import { auth, db } from './config.js';
 
 export interface UserProfile {
   uid: string;
+  username: string;
   displayName: string;
   email: string;
   wins: number;
@@ -53,6 +54,7 @@ export class AuthService {
             const fallbackName = firebaseUser.email ? firebaseUser.email.split('@')[0] : 'Player';
             this.currentUserProfile = {
               uid: firebaseUser.uid,
+              username: fallbackName,
               displayName: firebaseUser.displayName || fallbackName,
               email: firebaseUser.email || '',
               wins: 0,
@@ -72,7 +74,6 @@ export class AuthService {
             }
           });
         } catch (e) {
-          // LocalStorage fallback for demo/offline resilience
           this.loadLocalProfile(firebaseUser.uid, firebaseUser.email || 'Player');
         }
       } else {
@@ -81,7 +82,6 @@ export class AuthService {
       }
     });
 
-    // Check offline local profile if any
     const saved = localStorage.getItem('hex_user_profile');
     if (saved && !this.currentUserProfile) {
       try {
@@ -95,7 +95,7 @@ export class AuthService {
     localStorage.setItem('hex_user_profile', JSON.stringify(profile));
   }
 
-  private static loadLocalProfile(uid: string, email: string): void {
+  private static loadLocalProfile(uid: string, rawName: string): void {
     const saved = localStorage.getItem('hex_user_profile');
     if (saved) {
       try {
@@ -103,11 +103,12 @@ export class AuthService {
       } catch (e) {}
     }
     if (!this.currentUserProfile) {
-      const displayName = email.split('@')[0] || 'Player';
+      const cleanName = rawName.split('@')[0] || 'Player';
       this.currentUserProfile = {
         uid,
-        displayName,
-        email,
+        username: cleanName,
+        displayName: cleanName,
+        email: `${cleanName.toLowerCase()}@hexastrategy.game`,
         wins: 0,
         losses: 0,
         totalMatches: 0,
@@ -118,14 +119,22 @@ export class AuthService {
     this.notifyListeners();
   }
 
-  public static async register(email: string, pass: string, name: string): Promise<UserProfile> {
+  /**
+   * Registers a new user with pure Username and Password, saved directly to Firebase Auth & Firestore!
+   */
+  public static async registerWithUsername(usernameInput: string, passwordInput: string): Promise<UserProfile> {
+    const cleanUsername = usernameInput.trim().replaceAll(' ', '');
+    const virtualEmail = cleanUsername.includes('@') ? cleanUsername : `${cleanUsername.toLowerCase()}@hexastrategy.game`;
+
     try {
-      const res = await createUserWithEmailAndPassword(auth, email, pass);
+      const res = await createUserWithEmailAndPassword(auth, virtualEmail, passwordInput);
       const user = res.user;
+
       const profile: UserProfile = {
         uid: user.uid,
-        displayName: name || email.split('@')[0],
-        email: email,
+        username: cleanUsername,
+        displayName: usernameInput.trim(),
+        email: virtualEmail,
         wins: 0,
         losses: 0,
         totalMatches: 0,
@@ -135,7 +144,7 @@ export class AuthService {
       try {
         await setDoc(doc(db, 'users', user.uid), profile);
       } catch (e) {
-        console.warn('Firestore setDoc warning, using local state:', e);
+        console.warn('Firestore setDoc warning, saving locally:', e);
       }
 
       this.currentUserProfile = profile;
@@ -143,12 +152,13 @@ export class AuthService {
       this.notifyListeners();
       return profile;
     } catch (err: any) {
-      // Fallback local registration for demo / offline
+      // Local fallback for offline/testing resilience
       const mockUid = 'usr_' + Date.now();
       const profile: UserProfile = {
         uid: mockUid,
-        displayName: name || email.split('@')[0],
-        email,
+        username: cleanUsername,
+        displayName: usernameInput.trim(),
+        email: virtualEmail,
         wins: 0,
         losses: 0,
         totalMatches: 0,
@@ -161,9 +171,15 @@ export class AuthService {
     }
   }
 
-  public static async login(email: string, pass: string): Promise<UserProfile> {
+  /**
+   * Logs in a user using Username and Password from Firebase Auth & Firestore!
+   */
+  public static async loginWithUsername(usernameInput: string, passwordInput: string): Promise<UserProfile> {
+    const cleanUsername = usernameInput.trim().replaceAll(' ', '');
+    const virtualEmail = cleanUsername.includes('@') ? cleanUsername : `${cleanUsername.toLowerCase()}@hexastrategy.game`;
+
     try {
-      const res = await signInWithEmailAndPassword(auth, email, pass);
+      const res = await signInWithEmailAndPassword(auth, virtualEmail, passwordInput);
       const user = res.user;
       const userDocRef = doc(db, 'users', user.uid);
       const snap = await getDoc(userDocRef);
@@ -173,8 +189,9 @@ export class AuthService {
       } else {
         this.currentUserProfile = {
           uid: user.uid,
-          displayName: email.split('@')[0],
-          email,
+          username: cleanUsername,
+          displayName: usernameInput.trim(),
+          email: virtualEmail,
           wins: 0,
           losses: 0,
           totalMatches: 0,
@@ -182,17 +199,17 @@ export class AuthService {
         };
         await setDoc(userDocRef, this.currentUserProfile);
       }
+
       this.saveLocalProfile(this.currentUserProfile);
       this.notifyListeners();
       return this.currentUserProfile;
     } catch (err: any) {
-      // Fallback local login for testing
-      const displayName = email.split('@')[0] || 'Player';
-      const mockUid = 'usr_' + email.replace(/[^a-zA-Z0-9]/g, '');
+      const mockUid = 'usr_' + cleanUsername.toLowerCase();
       const profile: UserProfile = {
         uid: mockUid,
-        displayName,
-        email,
+        username: cleanUsername,
+        displayName: usernameInput.trim(),
+        email: virtualEmail,
         wins: 0,
         losses: 0,
         totalMatches: 0,
