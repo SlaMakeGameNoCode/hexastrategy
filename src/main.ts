@@ -728,80 +728,30 @@ window.addEventListener('DOMContentLoaded', () => {
     if (apFill) apFill.style.width = `${(remaining / 10) * 100}%`;
   }
 
-  // FIX BUG-0002: Extract battle-start logic into a shared function
+  // FIX: Start battle immediately without 3s countdown modal loop
   function actuallyStartBattle(): void {
     if (pvpBattleAutoTimer) { clearTimeout(pvpBattleAutoTimer); pvpBattleAutoTimer = null; }
     showPvpWaiting(false);
 
     const matchupModal = document.getElementById('matchup-modal');
-    const playerApEl = document.getElementById('matchup-player-ap');
-    const enemyApEl = document.getElementById('matchup-enemy-ap');
-    const playerListEl = document.getElementById('matchup-player-list');
-    const enemyListEl = document.getElementById('matchup-enemy-list');
-    const bannerEl = document.getElementById('matchup-initiative-banner');
-    const countdownEl = document.getElementById('matchup-countdown');
+    if (matchupModal) matchupModal.style.display = 'none';
 
-    const playerTotalAP = calculateSquadTotalAP('#3B82F6');
-    const enemyTotalAP = calculateSquadTotalAP('#EF4444');
+    turnManager.setPhase('PLANNING');
+    const deckDrawer = document.getElementById('deck-drawer');
+    const globalTurnContainer = document.getElementById('global-turn-container');
+    const phaseTitle2 = document.getElementById('phase-title');
 
-    if (playerTotalAP <= enemyTotalAP) {
-      firstTurnOwnerColor = '#3B82F6';
-      if (bannerEl) {
-        bannerEl.innerText = `👑 ĐỘI XANH (${playerTotalAP} AP) NHẸ HƠN ĐỘI ĐỎ (${enemyTotalAP} AP) -> XANH ĐI TRƯỚC!`;
-        bannerEl.style.borderColor = '#3B82F6';
-        bannerEl.style.color = '#60A5FA';
-      }
-    } else {
-      firstTurnOwnerColor = '#EF4444';
-      if (bannerEl) {
-        bannerEl.innerText = `⚡ ĐỘI ĐỎ (${enemyTotalAP} AP) NHẸ HƠN ĐỘI XANH (${playerTotalAP} AP) -> ĐỎ ĐI TRƯỚC!`;
-        bannerEl.style.borderColor = '#EF4444';
-        bannerEl.style.color = '#F87171';
-      }
+    if (deckDrawer) deckDrawer.style.display = 'none';
+    if (globalTurnContainer) globalTurnContainer.style.display = 'flex';
+    
+    // Set initial turn indicator based on color
+    const isMyTurn = pvpMode ? (myPvpColor === firstTurnOwnerColor) : true;
+    if (phaseTitle2) {
+      phaseTitle2.innerText = isMyTurn ? `Round 1 - 🟢 LƯỢT CỦA BẠN (10s)` : `Round 1 - 🔴 LƯỢT ĐỐI THỦ (10s)`;
     }
 
-    if (playerApEl) playerApEl.innerText = `Tổng AP: ${playerTotalAP}`;
-    if (enemyApEl) enemyApEl.innerText = `Tổng AP: ${enemyTotalAP}`;
-
-    if (playerListEl) {
-      playerListEl.innerHTML = units
-        .filter(u => u.ownerColor === '#3B82F6')
-        .map(u => {
-          const stats = ArmyRegistry.getStats(u.armyClass as ArmyClassId);
-          return `<div style="display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 8px;"><span>${u.name}</span><span style="color: #F59E0B;">${stats.actionCost} AP</span></div>`;
-        }).join('');
-    }
-    if (enemyListEl) {
-      enemyListEl.innerHTML = units
-        .filter(u => u.ownerColor === '#EF4444')
-        .map(u => {
-          const stats = ArmyRegistry.getStats(u.armyClass as ArmyClassId);
-          return `<div style="display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 8px;"><span>${u.name}</span><span style="color: #F59E0B;">${stats.actionCost} AP</span></div>`;
-        }).join('');
-    }
-
-    showPvpWaiting(false);
-    if (matchupModal) matchupModal.style.display = 'flex';
-    let countdown = 3;
-    if (countdownEl) countdownEl.innerText = '3';
-
-    const timerInterval = setInterval(() => {
-      countdown--;
-      if (countdownEl) countdownEl.innerText = countdown.toString();
-      if (countdown <= 0) {
-        clearInterval(timerInterval);
-        if (matchupModal) matchupModal.style.display = 'none';
-        turnManager.setPhase('PLANNING');
-        const deckDrawer = document.getElementById('deck-drawer');
-        const globalTurnContainer = document.getElementById('global-turn-container');
-        const phaseTitle2 = document.getElementById('phase-title');
-        if (deckDrawer) deckDrawer.style.display = 'none';
-        if (globalTurnContainer) globalTurnContainer.style.display = 'flex';
-        if (phaseTitle2) phaseTitle2.innerText = `Round 1 - Lập Kế Hoạch (${firstTurnOwnerColor === '#3B82F6' ? 'Xanh đi trước' : 'Đỏ đi trước'})`;
-        selectUnit(null);
-        startPlanningTimer();
-      }
-    }, 1000);
+    selectUnit(null);
+    startPlanningTimer();
   }
 
   // FIX BUG-0002: Try to start battle when both players ready (or auto after 30s)
